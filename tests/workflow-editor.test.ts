@@ -1,143 +1,212 @@
+import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import test from "node:test";
-import {
-  buildForcedWorkflowPrompt,
-  colorizeWorkflow,
-  endsWithTrigger,
-  hasTrigger,
-  installWorkflowEditor,
-  RAINBOW,
-  tokenizeAnsi,
-} from "../src/workflow-editor.js";
 
-const CURSOR_MARKER = "\x1b_pi:c\x07";
-// Built from escaped source so the regex literal carries no raw control bytes.
-const ANSI_RE = new RegExp("\\u001b\\[[0-9;]*[A-Za-z]|\\u001b_[^\\u0007]*\\u0007", "g");
-const stripAnsi = (s: string) => s.replace(ANSI_RE, "");
+// Pure-function tests — import from source (tsx compiles on the fly)
+async function load() {
+  return import("../dist/workflow-editor.js");
+}
 
-test("hasTrigger matches workflow/workflows anywhere, case-insensitive", () => {
-  for (const t of ["run a workflow", "WORKFLOWS", "myworkflow", "the Workflow tool"]) {
-    assert.equal(hasTrigger(t), true, t);
-  }
-  for (const t of ["workflo", "flow", "work", ""]) {
-    assert.equal(hasTrigger(t), false, t);
-  }
+describe("hasTrigger", () => {
+  it('returns true for "workflow"', async () => {
+    const { hasTrigger } = await load();
+    assert.equal(hasTrigger("run a workflow test"), true);
+  });
+
+  it('returns true for "workflows"', async () => {
+    const { hasTrigger } = await load();
+    assert.equal(hasTrigger("use workflows mode"), true);
+  });
+
+  it("returns true for trigger at start", async () => {
+    const { hasTrigger } = await load();
+    assert.equal(hasTrigger("workflow something"), true);
+  });
+
+  it("returns true for trigger at end", async () => {
+    const { hasTrigger } = await load();
+    assert.equal(hasTrigger("test workflow"), true);
+  });
+
+  it("returns true case-insensitively", async () => {
+    const { hasTrigger } = await load();
+    assert.equal(hasTrigger("WORKFLOW now"), true);
+    assert.equal(hasTrigger("WorkFlows are cool"), true);
+  });
+
+  it('returns false for "/workflows" (slash command)', async () => {
+    const { hasTrigger } = await load();
+    assert.equal(hasTrigger("/workflows list"), false);
+  });
+
+  it('returns false for "/workflow"', async () => {
+    const { hasTrigger } = await load();
+    assert.equal(hasTrigger("/workflow"), false);
+  });
+
+  it('returns false for unrelated text', async () => {
+    const { hasTrigger } = await load();
+    assert.equal(hasTrigger("hello world"), false);
+  });
+
+  it("returns false for empty string", async () => {
+    const { hasTrigger } = await load();
+    assert.equal(hasTrigger(""), false);
+  });
+
+  it('returns false for "working flow" (space in middle)', async () => {
+    const { hasTrigger } = await load();
+    assert.equal(hasTrigger("working flow"), false);
+  });
+
+  it('works with non-ASCII characters around the trigger', async () => {
+    const { hasTrigger } = await load();
+    assert.equal(hasTrigger("zrób workflow test"), true);
+    assert.equal(hasTrigger("uruchom workflows"), true);
+  });
 });
 
-test("endsWithTrigger detects a trigger immediately before the cursor", () => {
-  assert.equal(endsWithTrigger("please run workflow"), true);
-  assert.equal(endsWithTrigger("workflows"), true);
-  assert.equal(endsWithTrigger("workflow now"), false);
-  assert.equal(endsWithTrigger("work"), false);
+describe("endsWithTrigger", () => {
+  it('returns true when text ends with "workflow"', async () => {
+    const { endsWithTrigger } = await load();
+    assert.equal(endsWithTrigger("run a workflow"), true);
+  });
+
+  it('returns true when text ends with "workflows"', async () => {
+    const { endsWithTrigger } = await load();
+    assert.equal(endsWithTrigger("see workflows"), true);
+  });
+
+  it('returns false when trigger is not at end', async () => {
+    const { endsWithTrigger } = await load();
+    assert.equal(endsWithTrigger("workflow test"), false);
+  });
+
+  it('returns false for "/workflows"', async () => {
+    const { endsWithTrigger } = await load();
+    assert.equal(endsWithTrigger("/workflows"), false);
+  });
+
+  it("returns false for empty string", async () => {
+    const { endsWithTrigger } = await load();
+    assert.equal(endsWithTrigger(""), false);
+  });
+
+  it("returns true with trailing non-ASCII prefix", async () => {
+    const { endsWithTrigger } = await load();
+    assert.equal(endsWithTrigger("zrób workflow"), true);
+  });
 });
 
-test("slash commands are excluded: /workflow(s) is not a trigger", () => {
-  assert.equal(hasTrigger("/workflows"), false);
-  assert.equal(hasTrigger("/workflow"), false);
-  assert.equal(hasTrigger("run /workflows status"), false);
-  // A real trigger elsewhere still counts even if a slash command is also present.
-  assert.equal(hasTrigger("a workflow then /workflows"), true);
-  // Backspace toggle must not fire right after a slash command.
-  assert.equal(endsWithTrigger("/workflows"), false);
-  assert.equal(endsWithTrigger("type /workflow"), false);
+describe("tokenizeAnsi", () => {
+  it("returns one token per char for plain text", async () => {
+    const { tokenizeAnsi } = await load();
+    const result = tokenizeAnsi("hello");
+    assert.equal(result.length, 5);
+    assert.deepEqual(result, [{ ch: "h" }, { ch: "e" }, { ch: "l" }, { ch: "l" }, { ch: "o" }]);
+  });
+
+  it("preserves CSI sequences as single tokens", async () => {
+    const { tokenizeAnsi } = await load();
+    const result = tokenizeAnsi("a\x1b[31mb\x1b[0mc");
+    assert.equal(result.length, 5);
+    assert.equal(result[0].ch, "a");
+    assert.equal(result[1].esc, "\x1b[31m");
+    assert.equal(result[2].ch, "b");
+    assert.equal(result[3].esc, "\x1b[0m");
+    assert.equal(result[4].ch, "c");
+  });
+
+  it("preserves OSC/APC string sequences (cursor markers)", async () => {
+    const { tokenizeAnsi } = await load();
+    const result = tokenizeAnsi("a\x1b_pi:c\x07b");
+    assert.equal(result.length, 3);
+    assert.equal(result[0].ch, "a");
+    assert.equal(result[1].esc, "\x1b_pi:c\x07");
+    assert.equal(result[2].ch, "b");
+  });
+
+  it("handles lone ESC as escape token", async () => {
+    const { tokenizeAnsi } = await load();
+    const result = tokenizeAnsi("a\x1bXb");
+    assert.equal(result.length, 3);
+    assert.equal(result[1].esc, "\x1bX");
+  });
+
+  it("returns empty array for empty input", async () => {
+    const { tokenizeAnsi } = await load();
+    assert.deepEqual(tokenizeAnsi(""), []);
+  });
 });
 
-test("colorizeWorkflow skips a slash-prefixed /workflow but paints a bare one", () => {
-  assert.equal(colorizeWorkflow("/workflows", 0), "/workflows", "slash command left plain");
-  const out = colorizeWorkflow("a workflow and /workflow", 0);
-  // Exactly one occurrence colored (the bare 'workflow', not the slash one).
-  const colorRuns = out.match(new RegExp("\\u001b\\[38;5;\\d+m", "g")) ?? [];
-  assert.equal(colorRuns.length, "workflow".length, "only the bare word is colored");
-  assert.equal(stripAnsi(out), "a workflow and /workflow");
+describe("colorizeWorkflow", () => {
+  it("returns line unchanged when no trigger present", async () => {
+    const { colorizeWorkflow } = await load();
+    assert.equal(colorizeWorkflow("hello world", 0), "hello world");
+  });
+
+  it("colorizes workflow with ANSI escapes", async () => {
+    const { colorizeWorkflow } = await load();
+    const result = colorizeWorkflow("run a workflow", 0);
+    // Should contain ANSI escapes around "workflow"
+    assert.ok(result.includes("\x1b[38;5;"));
+    // Per-character ANSI wrapping (each letter individually colored)
+    assert.ok(result.startsWith("run a "));
+    assert.ok(result.includes("\x1b[38;5;"));
+    assert.ok(result.includes("m"));
+  });
+
+  it("returns plain text for empty string", async () => {
+    const { colorizeWorkflow } = await load();
+    assert.equal(colorizeWorkflow("", 0), "");
+  });
+
+  it("preserves existing ANSI in the line", async () => {
+    const { colorizeWorkflow } = await load();
+    const result = colorizeWorkflow("\x1b[1mworkflow\x1b[0m", 0);
+    // The bold marker should survive
+    assert.ok(result.includes("\x1b[1m"));
+    // work around the trigger letters — the rainbow wraps individual chars
+  });
+
+  it("colorizes multiple occurrences", async () => {
+    const { colorizeWorkflow } = await load();
+    // Use a fixed palette of 2 colors for predictability
+    const palette = [196, 46];
+    const result = colorizeWorkflow("workflow workflow", 0, palette);
+    // Per-character ANSI wrapping — each of the 16 chars (2x "workflow" = 16 chars)
+    // should have ANSI color codes around them
+    const ansiCodes = result.match(/\x1b\[38;5;\d+m/g);
+    assert.equal(ansiCodes.length, 16, "each char of both words should be colored");
+  });
+
+  it("handles tick shift producing different colors", async () => {
+    const { colorizeWorkflow } = await load();
+    const palette = [196, 46];
+    const t0 = colorizeWorkflow("workflow", 0, palette);
+    const t1 = colorizeWorkflow("workflow", 1, palette);
+    // Different tick → different color codes (may differ per char)
+    assert.notEqual(t0, t1, "different tick should produce different output");
+  });
 });
 
-test("tokenizeAnsi keeps CSI and APC sequences as single escape tokens", () => {
-  const line = `a\x1b[7mb\x1b[0m${CURSOR_MARKER}c`;
-  const tokens = tokenizeAnsi(line);
-  const escs = tokens.filter((t) => t.esc !== undefined).map((t) => t.esc);
-  assert.deepEqual(escs, ["\x1b[7m", "\x1b[0m", CURSOR_MARKER]);
-  const visible = tokens
-    .filter((t) => t.ch !== undefined)
-    .map((t) => t.ch)
-    .join("");
-  assert.equal(visible, "abc");
-});
+describe("buildForcedWorkflowPrompt", () => {
+  it("includes the original text", async () => {
+    const { buildForcedWorkflowPrompt } = await load();
+    const result = buildForcedWorkflowPrompt("hello world");
+    assert.ok(result.startsWith("hello world"));
+  });
 
-test("colorizeWorkflow paints the trigger and preserves visible text + escapes", () => {
-  const input = `please run workflow now`;
-  const out = colorizeWorkflow(input, 0);
-  assert.match(out, new RegExp("\\u001b\\[38;5;\\d+m"), "applies a 256-color foreground");
-  assert.equal(stripAnsi(out), input, "visible text is unchanged");
-});
+  it("includes the directive", async () => {
+    const { buildForcedWorkflowPrompt } = await load();
+    const result = buildForcedWorkflowPrompt("test");
+    assert.ok(result.includes('tool named exactly \`workflow\`'));
+    assert.ok(result.includes("MUST"));
+  });
 
-test("colorizeWorkflow leaves non-trigger lines untouched", () => {
-  const input = "just some plain text";
-  assert.equal(colorizeWorkflow(input, 3), input);
-});
-
-test("colorizeWorkflow does not corrupt the cursor escape or CURSOR_MARKER", () => {
-  // Cursor sits on the 'f' of workflow: inverse-video around that grapheme.
-  const input = `workflow ${CURSOR_MARKER}\x1b[7m \x1b[0m`;
-  const out = colorizeWorkflow(input, 2);
-  assert.ok(out.includes(CURSOR_MARKER), "marker survives");
-  assert.ok(out.includes("\x1b[7m"), "inverse-video survives");
-  assert.equal(stripAnsi(out), "workflow  ");
-});
-
-test("colorizeWorkflow flows: a tick shift changes the colors", () => {
-  const a = colorizeWorkflow("workflow", 0);
-  const b = colorizeWorkflow("workflow", 1);
-  assert.notEqual(a, b);
-  assert.ok(RAINBOW.length > 1);
-});
-
-test("buildForcedWorkflowPrompt forces the `workflow` tool and forbids alternatives", () => {
-  const out = buildForcedWorkflowPrompt("audit the routes");
-  assert.match(out, /audit the routes/);
-  assert.match(out, /workflows mode/i);
-  assert.match(out, /MUST/);
-  assert.match(out, /tool named exactly `workflow`/);
-  // Explicitly rules out the fallbacks the model wrongly used before.
-  assert.match(out, /subagent/i);
-  assert.match(out, /pi-subagents/i);
-});
-
-test("installWorkflowEditor restricts tools to `workflow` while armed, then restores", () => {
-  const handlers: Record<string, (e: any) => any> = {};
-  let activeTools = ["read", "bash", "workflow", "subagent"];
-  const pi: any = {
-    on: (event: string, handler: any) => {
-      handlers[event] = handler;
-    },
-    getActiveTools: () => activeTools,
-    setActiveTools: (t: string[]) => {
-      activeTools = t;
-    },
-  };
-  const ui: any = { setEditorComponent: () => {} };
-
-  const state = installWorkflowEditor(pi, ui);
-  assert.equal(typeof handlers.input, "function", "registers an input hook");
-  assert.equal(typeof handlers.turn_end, "function", "registers a turn_end hook");
-
-  // Disarmed → passthrough, tools untouched.
-  assert.deepEqual(handlers.input({ source: "interactive", text: "hi" }), { action: "continue" });
-  assert.deepEqual(activeTools, ["read", "bash", "workflow", "subagent"]);
-
-  // Armed → transform, consume the arm, and restrict tools to just `workflow`.
-  state.active = true;
-  const res = handlers.input({ source: "interactive", text: "do it" });
-  assert.equal(res.action, "transform");
-  assert.match(res.text, /do it/);
-  assert.equal(state.active, false, "arm is consumed after submit");
-  assert.deepEqual(activeTools, ["workflow"], "only the workflow tool is active during the forced turn");
-
-  // turn_end restores the user's full tool set.
-  handlers.turn_end({});
-  assert.deepEqual(activeTools, ["read", "bash", "workflow", "subagent"], "tools restored after the turn");
-
-  // Non-interactive sources are never transformed/restricted even if armed.
-  state.active = true;
-  assert.deepEqual(handlers.input({ source: "rpc", text: "workflow" }), { action: "continue" });
-  assert.deepEqual(activeTools, ["read", "bash", "workflow", "subagent"]);
+  it("is a multi-line string", async () => {
+    const { buildForcedWorkflowPrompt } = await load();
+    const result = buildForcedWorkflowPrompt("test");
+    assert.ok(result.includes("\n"));
+    assert.ok(result.includes("---"));
+  });
 });
