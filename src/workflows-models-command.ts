@@ -12,7 +12,6 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { listAvailableModelSpecs } from "./agent.js";
 import {
   buildDefaultTierConfig,
-  formatTierConfig,
   loadModelTierConfig,
   saveModelTierConfig,
   sortedTierNames,
@@ -44,24 +43,20 @@ export function registerWorkflowModelsCommand(pi: ExtensionAPI): void {
         menuOptions.push("─".repeat(30));
         for (const name of tiers) {
           const models = config.tiers[name];
-          const summary = models.length > 0 ? models.join(", ") : "(empty)";
-          menuOptions.push(`${name} → [${summary}]`);
+          menuOptions.push(`${name} tier (${models.length} models)`);
         }
         menuOptions.push("─".repeat(30));
 
         menuOptions.push("Reset to defaults");
         menuOptions.push(dirty ? "Save and exit" : "Exit");
 
-        const choice = await ctx.ui.select(
-          "Model tier configuration",
-          ["Current configuration", formatTierConfig(config), "", ...menuOptions],
-        );
+        const choice = await ctx.ui.select("Model tier configuration", menuOptions);
 
         if (!choice) break;
 
         // Handle "<tier> → [...]" selections
         for (const name of tiers) {
-          if (choice.startsWith(`${name} → [`)) {
+          if (choice.startsWith(`${name} tier (`)) {
             const updatedTiers = await editTier(ctx, config.tiers, name);
             if (updatedTiers !== null) {
               ensureFresh({ ...config, tiers: updatedTiers });
@@ -77,10 +72,7 @@ export function registerWorkflowModelsCommand(pi: ExtensionAPI): void {
           );
           if (confirmed) {
             ensureFresh(buildDefaultTierConfig());
-            ctx.ui.notify(
-              "Tiers reset to defaults. Use 'Save and exit' to persist.",
-              "info",
-            );
+            ctx.ui.notify("Tiers reset to defaults. Use 'Save and exit' to persist.", "info");
           }
         }
 
@@ -105,15 +97,9 @@ export function registerWorkflowModelsCommand(pi: ExtensionAPI): void {
 async function editTier(
   ctx: {
     ui: {
-      select: (
-        title: string,
-        options: string[],
-      ) => Promise<string | undefined>;
+      select: (title: string, options: string[]) => Promise<string | undefined>;
       notify: (msg: string, type?: "error" | "info" | "warning") => void;
-      confirm: (
-        title: string,
-        msg: string,
-      ) => Promise<boolean>;
+      confirm: (title: string, msg: string) => Promise<boolean>;
     };
   },
   tiers: Record<string, string[]>,
@@ -132,30 +118,19 @@ async function editTier(
       return `${selected ? "✓" : "○"} ${m}`;
     });
 
-    const options: string[] = [
-      `Current: ${currentStr}`,
-      "─".repeat(30),
-      ...modelOptions,
-      "─".repeat(30),
-    ];
+    const options: string[] = [`Current: ${currentStr}`, "─".repeat(30), ...modelOptions, "─".repeat(30)];
 
     if (current.length > 0) {
       options.push("Clear all");
     }
     options.push("Done");
 
-    const choice = await ctx.ui.select(
-      `Toggle models for "${tierName}" — click to add/remove`,
-      options,
-    );
+    const choice = await ctx.ui.select(`Toggle models for "${tierName}" — click to add/remove`, options);
 
     if (!choice || choice === "Done") break;
 
     if (choice === "Clear all") {
-      const confirmed = await ctx.ui.confirm(
-        "Clear tier",
-        `Remove all models from "${tierName}" tier?`,
-      );
+      const confirmed = await ctx.ui.confirm("Clear tier", `Remove all models from "${tierName}" tier?`);
       if (confirmed) {
         current = [];
         ctx.ui.notify(`"${tierName}" tier cleared.`, "info");
