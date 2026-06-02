@@ -11,7 +11,16 @@
  * When editing a tier, a single-select picker is used (like Pi's `/model`).
  */
 
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionCommandContext, Theme } from "@earendil-works/pi-coding-agent";
+import {
+  Container,
+  type SelectItem,
+  SelectList,
+  type SelectListTheme,
+  Spacer,
+  Text,
+  TUI,
+} from "@earendil-works/pi-tui";
 import { listAvailableModelSpecs } from "./agent.js";
 import {
   buildDefaultTierConfig,
@@ -92,46 +101,84 @@ export function registerWorkflowModelsCommand(pi: ExtensionAPI): void {
 }
 
 /**
- * Interactive editor for a single tier — single-select model picker.
+ * Interactive editor for a single tier — scrollable model picker.
  *
- * Shows ALL available models as-is (no prefixes — Pi's native
- * `ctx.ui.select()` already renders a focus indicator).
+ * Uses `ctx.ui.custom()` with Pi TUI's `SelectList` for proper
+ * scrollable list with limited visible rows (like `/advisor`).
+ *
  * The currently selected model is shown in the dialog title.
- * User picks one model or selects "Done" to return.
+ * User scrolls with ↑↓, selects with Enter, cancels with Escape.
  *
  * Returns the updated tiers object, or null if nothing changed.
  */
 export async function editSingleTier(
-  ctx: {
-    ui: {
-      select: (title: string, options: string[]) => Promise<string | undefined>;
-      notify: (msg: string, type?: "error" | "info" | "warning") => void;
-    };
-  },
+  ctx: ExtensionCommandContext,
   tiers: Record<string, string>,
   tierName: string,
 ): Promise<Record<string, string> | null> {
   const available = listAvailableModelSpecs();
   const current = tiers[tierName];
 
-  // Show ALL available models with no prefix — Pi's native select
-  // handles focus highlighting. The current selection is in the title.
-  const options: string[] = [
-    ...available,
-    "──",
-    "Done",
-  ];
+  // Build SelectItems: all available models as scrollable list
+  const items: SelectItem[] = available.map((m) => ({ value: m, label: m }));
 
-  const title = current
-    ? `Pick a model for "${tierName}" (current: ${current})`
-    : `Pick a model for "${tierName}"`;
-  const choice = await ctx.ui.select(title, options);
+  const result = await ctx.ui.custom<string | null>(
+    (tui: TUI, theme: Theme, _keybindings, done) => {
+      const container = new Container();
 
-  if (!choice || choice === "Done") return null;
+      // Title showing current model
+      const titleText = current
+        ? `Pick a model for "${tierName}" (current: ${current})`
+        : `Pick a model for "${tierName}"`;
+      container.addChild(new Text(theme.fg("accent", titleText), 1, 0));
+      container.addChild(new Spacer(1));
 
-  // choice is the raw model spec string
-  if (choice === current) return null; // no change
+      // SelectList theme
+      const selectTheme: SelectListTheme = {
+        selectedPrefix: (t: string) =>
+          theme.bg("selectedBg", theme.fg("accent", t)),
+        selectedText: (t: string) =>
+          theme.bg("selectedBg", theme.bold(t)),
+        description: (t: string) => theme.fg("muted", t),
+        scrollInfo: (t: string) => theme.fg("dim", t),
+        noMatch: (t: string) => theme.fg("warning", t),
+      };
 
-  ctx.ui.notify(`"${tierName}" tier → ${choice}`, "info");
-  return { ...tiers, [tierName]: choice };
+      const selectList = new SelectList(items, 12, selectTheme);
+
+      // Preselect the current model
+      if (current) {
+        const idx = items.findIndex((i) => i.value === current);
+        if (idx >= 0) selectList.setSelectedIndex(idx);
+      }
+
+      // Wire up callbacks
+      selectList.onSelect = (item) => done(item.value);
+      selectList.onCancel = () => done(null);
+
+      container.addChild(selectList);
+      container.addChild(new Spacer(1));
+      container.addChild(
+        new Text(
+          theme.fg("dim", "↑↓ navigate  enter select  esc cancel"),
+          1,
+          0,
+        ),
+      );
+
+      return {
+        render: (w: number) => container.render(w),
+        invalidate: () => container.invalidate(),
+        handleInput: (data: string) => {
+          selectList.handleInput(data);
+          tui.requestRender();
+        },
+      };
+    },
+  );
+
+  if (!result || result === current) return null;
+
+  ctx.ui.notify(`"${tierName}" tier → ${result}`, "info");
+  return { ...tiers, [tierName]: result };
 }

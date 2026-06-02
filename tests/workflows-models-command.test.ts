@@ -4,6 +4,9 @@
  * Since pi.registerCommand and ctx.ui functions are only available at runtime
  * inside Pi, these tests focus on the pure logic: command creation,
  * the editSingleTier single-select helper, and integration with model-tier-config.
+ *
+ * editSingleTier now uses ctx.ui.custom() with SelectList.
+ * In tests, we mock ctx.ui.custom to directly return the expected value.
  */
 import { describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
@@ -63,25 +66,12 @@ describe("workflows-models-command", () => {
       assert.equal(typeof mod.editSingleTier, "function");
     });
 
-    it("returns null when user selects Done", async () => {
+    it("returns null when user presses Escape (done with null)", async () => {
       const { editSingleTier } = await import("../src/workflows-models-command.js");
+      // Mock ctx.ui.custom to return null (simulating user cancelling)
       const ctx = {
         ui: {
-          select: mock.fn(() => Promise.resolve("Done")),
-          notify: mock.fn(),
-        },
-      };
-      const tiers: Record<string, string> = { small: "gpt-4.1-mini" };
-
-      const result = await editSingleTier(ctx as never, tiers, "small");
-      assert.equal(result, null);
-    });
-
-    it("returns null when select returns undefined", async () => {
-      const { editSingleTier } = await import("../src/workflows-models-command.js");
-      const ctx = {
-        ui: {
-          select: mock.fn(() => Promise.resolve(undefined)),
+          custom: mock.fn(async () => null),
           notify: mock.fn(),
         },
       };
@@ -93,13 +83,10 @@ describe("workflows-models-command", () => {
 
     it("returns null when user selects the same model (no change)", async () => {
       const { editSingleTier } = await import("../src/workflows-models-command.js");
-      // Simulate selecting the same current model
+      // Mock ctx.ui.custom to return the same model that's already selected
       const ctx = {
         ui: {
-          select: mock.fn(async (_title: string, opts: string[]) => {
-            // Return the current model as the selection (it appears in the list)
-            return "gpt-4.1-mini";
-          }),
+          custom: mock.fn(async () => "gpt-4.1-mini"),
           notify: mock.fn(),
         },
       };
@@ -111,13 +98,10 @@ describe("workflows-models-command", () => {
 
     it("selects a different model and returns updated tiers", async () => {
       const { editSingleTier } = await import("../src/workflows-models-command.js");
-      // Simulate selecting a different model
+      // Mock ctx.ui.custom to return a different model
       const ctx = {
         ui: {
-          select: mock.fn(async (_title: string, opts: string[]) => {
-            // Return the first non-"Done" non-"──" option as the new selection
-            return opts.find((o) => o !== "Done" && o !== "──");
-          }),
+          custom: mock.fn(async () => "gpt-5"),
           notify: mock.fn(),
         },
       };
@@ -125,8 +109,23 @@ describe("workflows-models-command", () => {
 
       const result = await editSingleTier(ctx as never, tiers, "small");
       assert.ok(result, "should return updated tiers");
-      assert.notEqual(result.small, "gpt-4.1-mini", "should have changed model");
+      assert.equal(result.small, "gpt-5", "should have changed model");
       assert.equal(typeof result.small, "string", "should still be a string");
+    });
+
+    it("selects a model when no current model exists", async () => {
+      const { editSingleTier } = await import("../src/workflows-models-command.js");
+      const ctx = {
+        ui: {
+          custom: mock.fn(async () => "openai/gpt-4.1-mini"),
+          notify: mock.fn(),
+        },
+      };
+      const tiers: Record<string, string> = {};
+
+      const result = await editSingleTier(ctx as never, tiers, "small");
+      assert.ok(result, "should return updated tiers");
+      assert.equal(result.small, "openai/gpt-4.1-mini");
     });
   });
 
