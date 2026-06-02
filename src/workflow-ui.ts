@@ -3,10 +3,11 @@
  *
  *   runs ──enter──▶ phases ──enter──▶ agents ──enter──▶ agent detail
  *        ◀──esc───        ◀──esc────         ◀──esc────
- *                     'v' ──▶ saved ──enter──▶ saved detail
+ *        ◀── (saved items in runs view) ──enter──▶ saved detail
  *
  * Keys: ↑/↓ (or j/k) select · enter/→ drill in · esc/← back (esc at top closes)
- *       p pause/resume · x stop · r restart · 'v' saved · q quit
+ *       On runs: p pause · x stop · r restart · s save · q quit
+ *       On saved: x delete · q quit
  *
  * The state machine and line rendering are pure and unit-tested; the pi-tui
  * Component shell (openWorkflowNavigator) wires them to live manager events.
@@ -42,7 +43,9 @@ export interface ThemeLike {
 
 const PLAIN: ThemeLike = { fg: (_c, t) => t, bold: (t) => t };
 
-export type ViewKind = "runs" | "phases" | "agents" | "detail" | "saved" | "savedDetail";
+export type ViewKind = "runs" | "phases" | "agents" | "detail" | "savedDetail";
+
+export type ItemKind = "run" | "saved";
 
 interface RunRow {
   runId: string;
@@ -110,7 +113,7 @@ export class NavigatorModel {
     return this.storage.list().sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  /** Delete a saved workflow by name from the configured storage. */
+  /** Delete a saved workflow by name. */
   deleteSaved(name: string): boolean {
     if (!this.storage) return false;
     return this.storage.delete(name);
@@ -208,6 +211,9 @@ export class NavigatorState {
   get cursor(): number {
     return this.top().cursor;
   }
+  set cursor(val: number) {
+    this.top().cursor = val;
+  }
   get runId(): string | undefined {
     return this.top().runId;
   }
@@ -223,6 +229,21 @@ export class NavigatorState {
   }
   get depth(): number {
     return this.stack.length;
+  }
+
+  /**
+   * Determine what kind of item is at the given cursor position in the
+   * runs view. Positions before runs.length are "run"; after are "saved".
+   */
+  itemKindAt(model: NavigatorModel, cursor: number): ItemKind {
+    const runCount = model.runs().length;
+    return cursor < runCount ? "run" : "saved";
+  }
+
+  /** Live cursor position within the current view's items. */
+  itemCursor(model: NavigatorModel): number {
+    if (this.kind === "runs") return this.cursor;
+    return this.top().cursor;
   }
 
   /** Clamp the cursor to [0, count). */
@@ -241,19 +262,24 @@ export class NavigatorState {
     t.cursor = (t.cursor + delta + count) % count;
   }
 
-  /** Open saved workflows view (reached from runs view with 'v'). */
-  openSaved(model: NavigatorModel): void {
-    this.stack.push({ kind: "saved", cursor: 0 });
-  }
-
   /** Drill into the selected item. Returns true if the view changed. */
   drill(model: NavigatorModel): boolean {
     const t = this.top();
     if (t.kind === "runs") {
       const runs = model.runs();
-      const run = runs[t.cursor];
-      if (!run) return false;
-      this.stack.push({ kind: "phases", cursor: 0, runId: run.runId });
+      const saved = model.saved();
+      if (t.cursor < runs.length) {
+        // Drilling into a run
+        const run = runs[t.cursor];
+        if (!run) return false;
+        this.stack.push({ kind: "phases", cursor: 0, runId: run.runId });
+        return true;
+      }
+      // Drilling into a saved workflow
+      const item = saved[t.cursor - runs.length];
+      if (!item) return false;
+      this.scroll = 0;
+      this.stack.push({ kind: "savedDetail", cursor: 0, savedName: item.name });
       return true;
     }
     if (t.kind === "phases" && t.runId) {
@@ -271,14 +297,6 @@ export class NavigatorState {
       this.stack.push({ kind: "detail", cursor: 0, runId: t.runId, phase: t.phase, agentId: ag.id });
       return true;
     }
-    if (t.kind === "saved") {
-      const saved = model.saved();
-      const item = saved[t.cursor];
-      if (!item) return false;
-      this.scroll = 0;
-      this.stack.push({ kind: "savedDetail", cursor: 0, savedName: item.name });
-      return true;
-    }
     return false;
   }
 
@@ -290,10 +308,13 @@ export class NavigatorState {
     return true;
   }
 
-  /** The runId the current view acts on (for pause/stop/save). */
+  /** The runId at cursor, or undefined when on a saved item. */
   activeRunId(model: NavigatorModel): string | undefined {
     if (this.runId) return this.runId;
-    if (this.kind === "runs") return model.runs()[this.cursor]?.runId;
+    if (this.kind === "runs") {
+      const runs = model.runs();
+      if (this.cursor < runs.length) return runs[this.cursor]?.runId;
+    }
     return undefined;
   }
 }
@@ -320,14 +341,29 @@ export function renderNavigator(
 
   if (state.kind === "runs") {
     const runs = model.runs();
-    state.clamp(runs.length);
+    const saved = model.saved();
+    const total = runs.length + saved.length;
+    state.clamp(total);
     lines.push(theme.bold("Workflows"));
-    if (!runs.length) lines.push(dim("  No runs yet. Start one with a background workflow."));
+    if (total === 0) {
+      lines.push(dim("  No runs yet. Start one with a background workflow."));
+    }
+    // Render runs
     runs.forEach((r, i) => {
       const icon = STATUS_ICON[r.status] ?? "?";
       const meta = [`${r.done}/${r.total}`, fmtTokens(r.tokens)].filter(Boolean).join(" · ");
       lines.push(sel(i, `${icon} ${r.name}  ${dim(`${r.runId} · ${r.status} · ${meta}`)}`));
     });
+    // Render saved workflows after a separator
+    if (saved.length > 0) {
+      const sepOffset = runs.length;
+      if (runs.length > 0) lines.push(dim("  ── saved ──"));
+      saved.forEach((w, i) => {
+        const loc = w.location === "user" ? "~" : ".";
+        const desc = w.description ? dim(`  ${w.description}`) : "";
+        lines.push(sel(sepOffset + i, `${w.name}${desc}  ${dim(loc)}`));
+      });
+    }
   } else if (state.kind === "phases" && state.runId) {
     const phases = model.phases(state.runId);
     state.clamp(phases.length);
@@ -358,23 +394,10 @@ export function renderNavigator(
       body.push(...wrap(a.prompt ?? "", width));
       body.push("", dim("Result:"));
       body.push(...wrap(a.resultPreview ?? "(none)", width));
-      // Scrollable region.
       const maxScroll = Math.max(0, body.length - 1);
       state.scroll = Math.min(state.scroll, maxScroll);
       lines.push(...body.slice(state.scroll));
     }
-  } else if (state.kind === "saved") {
-    const saved = model.saved();
-    state.clamp(saved.length);
-    lines.push(theme.bold("Saved Workflows"));
-    if (!saved.length) {
-      lines.push(dim("  No saved workflows yet. Save one from the runs view with 's'."));
-    }
-    saved.forEach((w, i) => {
-      const loc = w.location === "user" ? "~" : ".";
-      const meta = dim(`${loc} · ${w.description ? w.description : "(no description)"}`);
-      lines.push(sel(i, `${w.name}  ${meta}`));
-    });
   } else if (state.kind === "savedDetail" && state.savedName) {
     const saved = model.saved();
     const w = saved.find((s) => s.name === state.savedName);
@@ -394,22 +417,32 @@ export function renderNavigator(
   }
 
   lines.push("");
-  lines.push(footerHint(state, theme));
+  lines.push(footerHint(state, model, theme));
   return lines;
 }
 
-function footerHint(state: NavigatorState, theme: ThemeLike): string {
+function footerHint(state: NavigatorState, model: NavigatorModel, theme: ThemeLike): string {
   const parts: string[] = [];
   switch (state.kind) {
     case "detail":
-    case "savedDetail":
       parts.push("j/k scroll", "esc back");
       break;
-    case "saved":
-      parts.push("↑/↓ select", "enter open", "v runs", "x delete", "esc back");
+    case "savedDetail":
+      parts.push("j/k scroll", "esc back", "x delete");
       break;
+    case "runs": {
+      const itemKind = model.saved().length > 0 ? state.itemKindAt(model, state.cursor) : "run";
+      parts.push("↑/↓ select", "enter open", "esc back");
+      if (itemKind === "run") {
+        parts.push("p pause", "x stop", "r restart", "s save");
+      } else {
+        parts.push("x delete");
+      }
+      parts.push("q quit");
+      break;
+    }
     default:
-      parts.push("↑/↓ select", "enter open", "esc back", "p pause", "x stop", "r restart", "s save", "v saved", "q quit");
+      parts.push("↑/↓ select", "enter open", "esc back", "q quit");
   }
   return theme.fg("dim", parts.join(" · "));
 }
@@ -442,11 +475,10 @@ export type NavAction =
   | { type: "stop" }
   | { type: "restart" }
   | { type: "save" }
-  | { type: "viewSaved" }
   | { type: "deleteSaved" }
   | { type: "none" };
 
-export function keyToAction(keyId: string | undefined, kind: ViewKind): NavAction {
+export function keyToAction(keyId: string | undefined, kind: ViewKind, itemKind?: "run" | "saved"): NavAction {
   switch (keyId) {
     case "up":
       return { type: "move", delta: -1 };
@@ -470,25 +502,22 @@ export function keyToAction(keyId: string | undefined, kind: ViewKind): NavActio
     case "p":
       return { type: "pause" };
     case "x":
-      if (kind === "saved" || kind === "savedDetail") return { type: "deleteSaved" };
+      if (kind === "savedDetail" || itemKind === "saved") return { type: "deleteSaved" };
       return { type: "stop" };
     case "r":
       return { type: "restart" };
     case "s":
+      if (itemKind === "saved") return { type: "none" };
       return { type: "save" };
-    case "v":
-      if (kind === "runs") return { type: "viewSaved" };
-      return { type: "back" }; // 'v' in saved view goes back to runs
     default:
       return { type: "none" };
   }
 }
 
 function currentCount(state: NavigatorState, model: NavigatorModel): number {
-  if (state.kind === "runs") return model.runs().length;
+  if (state.kind === "runs") return model.runs().length + model.saved().length;
   if (state.kind === "phases" && state.runId) return model.phases(state.runId).length;
   if (state.kind === "agents" && state.runId && state.phase) return model.agents(state.runId, state.phase).length;
-  if (state.kind === "saved") return model.saved().length;
   return 0;
 }
 
@@ -521,7 +550,8 @@ export function openWorkflowNavigator(
       };
 
       const act = (data: string) => {
-        const action = keyToAction(parseKey(data), state.kind);
+        const itemKind = state.kind === "runs" ? state.itemKindAt(model, state.cursor) : undefined;
+        const action = keyToAction(parseKey(data), state.kind, itemKind);
         switch (action.type) {
           case "move":
             state.move(action.delta, currentCount(state, model));
@@ -539,13 +569,11 @@ export function openWorkflowNavigator(
             cleanup();
             done();
             return;
-          case "viewSaved":
-            state.openSaved(model);
-            break;
           case "deleteSaved": {
-            if (state.kind === "saved") {
+            if (state.kind === "runs") {
               const saved = model.saved();
-              const item = saved[state.cursor];
+              const runCount = model.runs().length;
+              const item = saved[state.cursor - runCount];
               if (item) {
                 model.deleteSaved(item.name);
                 ui.notify(`Deleted /${item.name}`, "info");
@@ -553,7 +581,7 @@ export function openWorkflowNavigator(
             } else if (state.kind === "savedDetail" && state.savedName) {
               model.deleteSaved(state.savedName);
               ui.notify(`Deleted /${state.savedName}`, "info");
-              state.back(); // Go back to saved list after delete
+              state.back();
             }
             break;
           }
@@ -568,9 +596,6 @@ export function openWorkflowNavigator(
             break;
           }
           case "restart": {
-            // Restart re-runs the whole workflow from scratch as a fresh
-            // background run (per-agent restart isn't meaningful — agents are
-            // driven by the script). The new run auto-delivers when it finishes.
             const id = state.activeRunId(model);
             const run = id ? manager.listRuns().find((r) => r.runId === id) : undefined;
             if (!run?.script) {

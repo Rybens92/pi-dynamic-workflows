@@ -82,6 +82,21 @@ function persistedRunManager() {
   } as any;
 }
 
+function savedStorage() {
+  return {
+    list: () => [
+      { name: "deploy", description: "Deploy to prod", location: "project", path: "/x", savedAt: "2025-01-01", script: "export const meta = { name: 'deploy', description: 'Deploy to prod' };" },
+      { name: "analyze", description: "Analyze deps", location: "user", path: "/y", savedAt: "2025-01-02", script: "export const meta = { name: 'analyze', description: 'Analyze deps' };" },
+      { name: "backup", description: "Full backup", location: "user", path: "/z", savedAt: "2025-01-03", script: "export const meta = { name: 'backup', description: 'Full backup' };" },
+    ],
+    delete: () => true,
+  } as any;
+}
+
+function emptySavedStorage() {
+  return { list: () => [], delete: () => true } as any;
+}
+
 test("NavigatorModel reads runs, phases, agents, and detail", () => {
   const model = new NavigatorModel(fakeManager());
   const runs = model.runs();
@@ -218,7 +233,8 @@ test("NavigatorState clamp handles zero items", () => {
   assert.equal(state.cursor, 0);
 });
 
-test("keyToAction maps keys per view", () => {
+test("keyToAction maps keys per view and itemKind", () => {
+  // Navigation keys (kind-independent)
   assert.deepEqual(keyToAction("up", "runs"), { type: "move", delta: -1 });
   assert.deepEqual(keyToAction("j", "agents"), { type: "move", delta: 1 });
   assert.deepEqual(keyToAction("enter", "runs"), { type: "drill" });
@@ -227,14 +243,24 @@ test("keyToAction maps keys per view", () => {
   assert.deepEqual(keyToAction("escape", "phases"), { type: "back" });
   assert.deepEqual(keyToAction("left", "agents"), { type: "back" });
   assert.deepEqual(keyToAction("q", "runs"), { type: "close" });
-  assert.deepEqual(keyToAction("p", "runs"), { type: "pause" });
-  assert.deepEqual(keyToAction("x", "agents"), { type: "stop" });
-  assert.deepEqual(keyToAction("s", "runs"), { type: "save" });
-  assert.deepEqual(keyToAction("r", "runs"), { type: "restart" });
   assert.deepEqual(keyToAction("k", "runs"), { type: "move", delta: -1 });
   assert.deepEqual(keyToAction("unknown", "runs"), { type: "none" });
   assert.deepEqual(keyToAction(undefined, "runs"), { type: "none" });
   assert.deepEqual(keyToAction("return", "agents"), { type: "drill" });
+
+  // 'x' = stop on runs, deleteSaved on saved items
+  assert.deepEqual(keyToAction("x", "runs", "run"), { type: "stop" });
+  assert.deepEqual(keyToAction("x", "runs", "saved"), { type: "deleteSaved" });
+  assert.deepEqual(keyToAction("x", "savedDetail"), { type: "deleteSaved" });
+  assert.deepEqual(keyToAction("x", "phases"), { type: "stop" }); // no itemKind = stop
+
+  // 's' = save on runs, none on saved items
+  assert.deepEqual(keyToAction("s", "runs", "run"), { type: "save" });
+  assert.deepEqual(keyToAction("s", "runs", "saved"), { type: "none" });
+
+  // 'p' and 'r' unchanged
+  assert.deepEqual(keyToAction("p", "runs"), { type: "pause" });
+  assert.deepEqual(keyToAction("r", "runs"), { type: "restart" });
 });
 
 test("renderNavigator shows runs view with selected row and footer hint", () => {
@@ -244,7 +270,7 @@ test("renderNavigator shows runs view with selected row and footer hint", () => 
   const text = lines.join("\n");
   assert.match(text, /Workflows/);
   assert.match(text, /❯ ◆ audit/);
-  assert.match(text, /enter open/); // footer hint
+  assert.match(text, /enter open/);
 });
 
 test("renderNavigator shows empty hint when no runs", () => {
@@ -297,7 +323,7 @@ test("renderNavigator shows agent detail view", () => {
   assert.match(text, /found 2/);
   assert.match(text, /Status:/);
   assert.match(text, /Model:/);
-  assert.match(text, /model/); // shortModel strips provider prefix → shows just "model"
+  assert.match(text, /model/); // shortModel strips provider prefix
   assert.match(text, /j\/k scroll/); // detail view footer
 });
 
@@ -308,7 +334,6 @@ test("renderNavigator shows model info in agent rows", () => {
   state.drill(model);
   const lines = renderNavigator(state, model, 80);
   const text = lines.join("\n");
-  // shortModel() strips the provider prefix so "fast-llm/model" displays as just "model"
   assert.match(text, /model/);
 });
 
@@ -329,103 +354,90 @@ test("renderNavigator shows correct footer hint per view", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Saved workflows navigator
+// Saved workflows in unified runs view
 // ═══════════════════════════════════════════════════════════════════════════
-
-function savedStorage() {
-  return {
-    list: () => [
-      { name: "deploy", description: "Deploy to prod", location: "project", path: "/x", savedAt: "2025-01-01" },
-      { name: "analyze", description: "Analyze deps", location: "user", path: "/y", savedAt: "2025-01-02" },
-      { name: "backup", description: "Full backup", location: "user", path: "/z", savedAt: "2025-01-03" },
-    ],
-    delete: () => true,
-  } as any;
-}
-
-function emptySavedStorage() {
-  return { list: () => [], delete: () => true } as any;
-}
 
 test("NavigatorModel.saved returns sorted saved workflows from storage", () => {
   const model = new NavigatorModel(fakeManager(), savedStorage());
   const saved = model.saved();
   assert.equal(saved.length, 3);
-  // Sorted alphabetically
   assert.equal(saved[0].name, "analyze");
   assert.equal(saved[1].name, "backup");
   assert.equal(saved[2].name, "deploy");
 });
 
-test("NavigatorModel.saved returns empty array when no storage configured", () => {
+test("NavigatorModel.saved returns empty array when no storage", () => {
   const model = new NavigatorModel(fakeManager());
-  const saved = model.saved();
-  assert.deepEqual(saved, []);
+  assert.deepEqual(model.saved(), []);
 });
 
-test("NavigatorModel.saved returns empty array when storage has no items", () => {
+test("NavigatorModel.saved returns empty when storage is empty", () => {
   const model = new NavigatorModel(fakeManager(), emptySavedStorage());
-  const saved = model.saved();
-  assert.deepEqual(saved, []);
+  assert.deepEqual(model.saved(), []);
 });
 
-test("NavigatorState drill from runs view saves and goes to saved view", () => {
+test("renderNavigator shows saved workflows in runs view with separator", () => {
   const model = new NavigatorModel(fakeManager(), savedStorage());
   const state = new NavigatorState();
-  
-  // In saved view, enter drills into a saved item to show its detail
-  state.drill(model); // runs → phases
-  state.back();
-  assert.equal(state.kind, "runs");
-  
-  // After new approach: the runs view stays as-is, saved is reached differently
-});
-
-test("keyToAction maps 'v' to viewSaved in runs view", () => {
-  assert.deepEqual(keyToAction("v", "runs"), { type: "viewSaved" });
-  assert.deepEqual(keyToAction("v", "saved"), { type: "back" });
-  assert.deepEqual(keyToAction("escape", "saved"), { type: "back" });
-  assert.deepEqual(keyToAction("enter", "saved"), { type: "drill" });
-});
-
-test("keyToAction maps 'x' to deleteSaved in saved view", () => {
-  assert.deepEqual(keyToAction("x", "saved"), { type: "deleteSaved" });
-  assert.deepEqual(keyToAction("x", "savedDetail"), { type: "deleteSaved" });
-  assert.deepEqual(keyToAction("x", "runs"), { type: "stop" }); // unchanged
-});
-
-test("renderNavigator shows saved view with saved workflows", () => {
-  const model = new NavigatorModel(fakeManager(), savedStorage());
-  const state = new NavigatorState();
-  state.openSaved(model); // new method
-  assert.equal(state.kind, "saved");
-  
   const lines = renderNavigator(state, model, 80);
   const text = lines.join("\n");
-  assert.match(text, /Saved Workflows/);
-  assert.match(text, /analyze/);
+  
+  assert.match(text, /Workflows/);
+  assert.match(text, /◆ audit/); // runs section
+  assert.match(text, /saved/); // separator or section header
+  assert.match(text, /analyze/); // saved item
   assert.match(text, /backup/);
   assert.match(text, /deploy/);
-  assert.match(text, /\./);  // project location indicator
-  assert.match(text, /~/);      // user location indicator
-  assert.match(text, /Analyze deps/);
+  assert.match(text, /~/); // user location
+  assert.match(text, /\./); // project location
 });
 
-test("renderNavigator shows empty hint when no saved workflows", () => {
-  const model = new NavigatorModel(fakeManager(), emptySavedStorage());
-  const state = new NavigatorState();
-  state.openSaved(model);
-  const lines = renderNavigator(state, model, 80);
-  const text = lines.join("\n");
-  assert.match(text, /No saved workflows/);
-  assert.match(text, /Save one from the runs view with /);
-});
-
-test("renderNavigator shows saved detail view for a saved workflow", () => {
+test("renderNavigator cursor tracks across runs and saved items", () => {
   const model = new NavigatorModel(fakeManager(), savedStorage());
   const state = new NavigatorState();
-  state.openSaved(model);
-  state.drill(model); // enter first saved item → savedDetail
+  
+  // Total items = 1 run + 3 saved = 4
+  // Cursor at 0 = first run
+  state.move(1, 4);
+  assert.equal(state.cursor, 1); // first saved item
+  state.move(1, 4);
+  assert.equal(state.cursor, 2); // second saved item
+});
+
+test("NavigatorState drill on saved item opens savedDetail", () => {
+  const model = new NavigatorModel(fakeManager(), savedStorage());
+  const state = new NavigatorState();
+  
+  // Total = 1 run + 3 saved = 4. Move cursor to position 1 = first saved item.
+  // set cursor directly to avoid wrapping from move()
+  state.cursor = 1;
+  
+  const drilled = state.drill(model);
+  assert.ok(drilled);
+  assert.equal(state.kind, "savedDetail");
+  assert.equal(state.savedName, "analyze");
+});
+
+test("NavigatorState drill on saved item goes to savedDetail then back to runs", () => {
+  const model = new NavigatorModel(fakeManager(), savedStorage());
+  const state = new NavigatorState();
+  
+  // Move cursor to first saved item and drill
+  state.move(1, 4);
+  assert.ok(state.drill(model));
+  assert.equal(state.kind, "savedDetail");
+  
+  // Back to runs
+  assert.ok(state.back());
+  assert.equal(state.kind, "runs");
+});
+
+test("renderNavigator shows saved detail view", () => {
+  const model = new NavigatorModel(fakeManager(), savedStorage());
+  const state = new NavigatorState();
+  
+  state.cursor = 1; // first saved item
+  state.drill(model);
   assert.equal(state.kind, "savedDetail");
   
   const lines = renderNavigator(state, model, 80);
@@ -435,58 +447,70 @@ test("renderNavigator shows saved detail view for a saved workflow", () => {
   assert.match(text, /Location:/);
   assert.match(text, /Script:/);
   assert.match(text, /Saved at:/);
+  assert.match(text, /j\/k scroll/);
+  assert.match(text, /esc back/);
 });
 
-test("renderNavigator saved view has correct footer hint", () => {
+test("renderNavigator saved detail shows 'x delete' in footer", () => {
   const model = new NavigatorModel(fakeManager(), savedStorage());
   const state = new NavigatorState();
-  state.openSaved(model);
-  const text = renderNavigator(state, model, 80).join("\n");
-  assert.match(text, /v runs/);
-  assert.match(text, /x delete/);
   
-  // Detail view footer
+  state.cursor = 1; // first saved item
   state.drill(model);
-  const detailText = renderNavigator(state, model, 80).join("\n");
-  assert.match(detailText, /j\/k scroll/);
-  assert.match(detailText, /esc back/);
-});
-
-test("NavigatorState openSaved pushes a saved frame", () => {
-  const model = new NavigatorModel(fakeManager(), savedStorage());
-  const state = new NavigatorState();
-  state.openSaved(model);
-  assert.equal(state.kind, "saved");
-  assert.equal(state.depth, 2);
-});
-
-test("NavigatorState saved depth allows back to runs and close", () => {
-  const model = new NavigatorModel(fakeManager(), savedStorage());
-  const state = new NavigatorState();
-  state.openSaved(model);
-  assert.equal(state.depth, 2);
   
-  assert.ok(state.back());
-  assert.equal(state.kind, "runs");
-  assert.equal(state.back(), false); // top-level close
+  const text = renderNavigator(state, model, 80).join("\n");
+  assert.match(text, /x delete/);
 });
 
-test("NavigatorState drill in saved view goes to savedDetail then back", () => {
+test("NavigatorState activeRunId returns undefined for saved items", () => {
   const model = new NavigatorModel(fakeManager(), savedStorage());
   const state = new NavigatorState();
-  state.openSaved(model);
   
-  assert.ok(state.drill(model));
-  assert.equal(state.kind, "savedDetail");
-  assert.equal(state.savedName, "analyze");
-  
-  assert.ok(state.back());
-  assert.equal(state.kind, "saved");
-});
-
-test("NavigatorState activeRunId works in saved view (returns undefined)", () => {
-  const model = new NavigatorModel(fakeManager(), savedStorage());
-  const state = new NavigatorState();
-  state.openSaved(model);
+  // Move cursor to first saved item
+  state.cursor = 1;
   assert.equal(state.activeRunId(model), undefined);
+});
+
+test("itemKindAt returns 'run' for run items and 'saved' for saved items", () => {
+  const model = new NavigatorModel(fakeManager(), savedStorage());
+  const state = new NavigatorState();
+  
+  assert.equal(state.itemKindAt(model, 0), "run");
+  assert.equal(state.itemKindAt(model, 1), "saved");
+  assert.equal(state.itemKindAt(model, 3), "saved");
+});
+
+test("itemKindAt returns 'run' when no storage configured", () => {
+  const model = new NavigatorModel(fakeManager());
+  const state = new NavigatorState();
+  
+  assert.equal(state.itemKindAt(model, 0), "run");
+});
+
+test("renderNavigator shows empty saved hint when no saved workflows", () => {
+  const model = new NavigatorModel(fakeManager(), emptySavedStorage());
+  const state = new NavigatorState();
+  const lines = renderNavigator(state, model, 80);
+  const text = lines.join("\n");
+  // Should show runs section but no saved section
+  assert.match(text, /Workflows/);
+  assert.match(text, /◆ audit/);
+  // Should not mention saved at all
+  assert.ok(!text.includes("saved"), "should not show saved section when empty");
+});
+
+test("renderNavigator footer hint changes based on item under cursor", () => {
+  const model = new NavigatorModel(fakeManager(), savedStorage());
+  const state = new NavigatorState();
+  
+  // Cursor on a run (position 0)
+  state.cursor = 0;
+  const runText = renderNavigator(state, model, 80).join("\n");
+  assert.notEqual(runText.indexOf("x stop"), -1, "run item should show x stop");
+  
+  // Cursor on a saved item (position 1)
+  state.cursor = 1;
+  const savedText = renderNavigator(state, model, 80).join("\n");
+  assert.notEqual(savedText.indexOf("x delete"), -1, "saved item should show x delete");
+  assert.equal(savedText.indexOf("x stop"), -1, "saved item should NOT show x stop");
 });
