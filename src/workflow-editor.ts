@@ -260,9 +260,12 @@ export function installWorkflowEditor(pi: ExtensionAPI, ui: ExtensionUIContext):
   // When armed at submit time, rewrite the user's message to force a workflow AND
   // restrict this turn's tools to just `workflow`, so the model can't fall back to
   // the subagent tool, a skill, or a direct answer. Restored at turn_end.
+  //
+  // NOTE: we check event.text directly (hasTrigger) rather than state.active from
+  // the editor, because the editor's state is reset synchronously by submitValue()
+  // BEFORE the input event fires (the actual prompt processing is async).
   pi.on("input", (event: { source?: string; text?: string }) => {
-    if (event.source !== "interactive" || !state.active || !event.text) return { action: "continue" } as const;
-    state.active = false; // consume the arm for this submission
+    if (event.source !== "interactive" || !event.text || !hasTrigger(event.text)) return { action: "continue" } as const;
     try {
       if (savedTools === undefined) savedTools = pi.getActiveTools?.();
       pi.setActiveTools?.([WORKFLOW_TOOL_NAME]);

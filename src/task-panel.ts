@@ -19,16 +19,30 @@ export interface TaskPanelOptions {
 }
 
 function deliverText(run: ManagedRun): string {
-  const r = run.result?.result as { report?: unknown } | undefined;
-  const body =
-    r && typeof r.report === "string" && r.report.trim() ? r.report : JSON.stringify(run.result?.result, null, 2);
+  const result = run.result?.result as Record<string, unknown> | undefined;
+  // Try to find a clean text summary in order of preference:
+  // 1. verdict (most common for orchestrate/deep-research workflows)
+  // 2. report (custom report property)
+  // 3. summary (short summary)
+  // 4. string result directly
+  // 5. fallback: first 400 chars of JSON
+  const summary =
+    result && typeof result.verdict === "string" && result.verdict.trim()
+      ? result.verdict
+      : result && typeof result.report === "string" && result.report.trim()
+        ? result.report
+        : result && typeof result.summary === "string" && result.summary.trim()
+          ? result.summary
+          : typeof result === "string"
+            ? result
+            : result != null ? JSON.stringify(result, null, 2).slice(0, 400) + (JSON.stringify(result, null, 2).length > 400 ? "\n…(truncated)" : "") : "null";
   const tokens = run.result?.tokenUsage ? ` · ${run.result.tokenUsage.total.toLocaleString()} tokens` : "";
   const agents = run.result?.agentCount ?? run.snapshot.agentCount;
+  const duration = run.result?.durationMs ? ` · ${(run.result.durationMs / 1000).toFixed(1)}s` : "";
   return [
-    `✓ Background workflow "${run.snapshot.name}" finished (${agents} agents${tokens}).`,
-    "Continue helping the user based on this result.",
+    `✓ Background workflow "${run.snapshot.name}" finished (${agents} agents${tokens}${duration}).`,
     "",
-    body,
+    summary,
   ].join("\n");
 }
 
@@ -45,14 +59,25 @@ function deliverText(run: ManagedRun): string {
  * Set up once per extension; idempotent via an internal guard.
  */
 export function installResultDelivery(pi: ExtensionAPI, manager: WorkflowManager): void {
-  if ((manager as unknown as { __deliveryInstalled?: boolean }).__deliveryInstalled) return;
-  (manager as unknown as { __deliveryInstalled?: boolean }).__deliveryInstalled = true;
+  // Mutable holder on manager so shared across re-calls (e.g. session_start after /reload).
+  const m = manager as unknown as { __deliveryInstalled?: boolean; __holder?: { pi: ExtensionAPI } };
+  if (m.__deliveryInstalled) {
+    // Refresh pi reference only — listeners stay registered.
+    if (m.__holder) m.__holder.pi = pi;
+    return;
+  }
+  m.__deliveryInstalled = true;
+  m.__holder = { pi };
 
   const deliver = (content: string) => {
-    void pi.sendMessage(
-      { customType: "workflow-result", content, display: true },
-      { triggerTurn: true, deliverAs: "followUp" },
-    );
+    try {
+      void m.__holder!.pi.sendMessage(
+        { customType: "workflow-result", content, display: true },
+        { triggerTurn: true, deliverAs: "followUp" },
+      );
+    } catch {
+      // Stale ctx after reload — result still visible via /workflows.
+    }
   };
 
   manager.on("complete", ({ runId }: { runId: string }) => {

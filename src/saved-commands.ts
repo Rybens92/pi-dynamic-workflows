@@ -6,6 +6,7 @@
 import { createCodingTools, type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { runWorkflow, type WorkflowRunResult } from "./workflow.js";
 import type { SavedWorkflow, WorkflowStorage } from "./workflow-saved.js";
+import type { WorkflowManager } from "./workflow-manager.js";
 
 function isRegistered(pi: ExtensionAPI, name: string): boolean {
   try {
@@ -42,19 +43,35 @@ export function parseCommandArgs(raw: string, parameters?: SavedWorkflow["parame
   return out;
 }
 
-/** Register one saved workflow as a `/<name>` command (idempotent). */
-export function registerSavedWorkflow(pi: ExtensionAPI, cwd: string, wf: SavedWorkflow): void {
+/** Register one saved workflow as a `/<name>` command (idempotent).
+ * When a WorkflowManager is provided, the workflow runs through it (visible in
+ * /workflows TUI, background execution, task panel). Otherwise falls back to
+ * the inline runWorkflow() (foreground, no TUI tracking). */
+export function registerSavedWorkflow(pi: ExtensionAPI, cwd: string, wf: SavedWorkflow, manager?: WorkflowManager): void {
   if (isRegistered(pi, wf.name)) return;
   pi.registerCommand(wf.name, {
     description: wf.description || `Saved workflow: ${wf.name}`,
     async handler(args: string, ctx: ExtensionCommandContext) {
       try {
-        const result = await runWorkflow(wf.script, {
-          cwd,
-          args: parseCommandArgs(args, wf.parameters),
-          tools: createCodingTools(cwd),
-          onPhase: (title) => ctx.ui.setStatus(`wf:${wf.name}`, `${wf.name}: ${title}`),
-        });
+        ctx.ui.notify(`Starting /${wf.name}…`, "info");
+
+        let result: WorkflowRunResult;
+        if (manager) {
+          // Run through the WorkflowManager: background execution, visible in
+          // /workflows TUI, task panel, pause/resume/stop support.
+          const { runId, promise } = manager.startInBackground(wf.script, parseCommandArgs(args, wf.parameters));
+          ctx.ui.setStatus(`wf:${wf.name}`, `${wf.name}: running (${runId})`);
+          result = await promise;
+        } else {
+          // Fallback: inline runWorkflow (foreground, no TUI tracking).
+          result = await runWorkflow(wf.script, {
+            cwd,
+            args: parseCommandArgs(args, wf.parameters),
+            tools: createCodingTools(cwd),
+            onPhase: (title) => ctx.ui.setStatus(`wf:${wf.name}`, `${wf.name}: ${title}`),
+          });
+        }
+
         ctx.ui.setStatus(`wf:${wf.name}`, undefined);
         await pi.sendMessage({ customType: `workflow:${wf.name}`, content: reportText(result), display: true });
       } catch (error) {
@@ -65,7 +82,9 @@ export function registerSavedWorkflow(pi: ExtensionAPI, cwd: string, wf: SavedWo
   });
 }
 
-/** Register every saved workflow found in storage. */
-export function registerAllSavedWorkflows(pi: ExtensionAPI, cwd: string, storage: WorkflowStorage): void {
-  for (const wf of storage.list()) registerSavedWorkflow(pi, cwd, wf);
+/** Register every saved workflow found in storage.
+ * When a WorkflowManager is provided, workflows run through it (visible in
+ * /workflows TUI, background execution, task panel). */
+export function registerAllSavedWorkflows(pi: ExtensionAPI, cwd: string, storage: WorkflowStorage, manager?: WorkflowManager): void {
+  for (const wf of storage.list()) registerSavedWorkflow(pi, cwd, wf, manager);
 }
