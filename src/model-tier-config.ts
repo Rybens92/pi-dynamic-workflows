@@ -38,6 +38,82 @@ export interface ModelTierConfig {
 }
 
 // ---------------------------------------------------------------------------
+// Classification helpers
+// ---------------------------------------------------------------------------
+
+/** Big: top reasoning/thinking models. */
+function isBigModel(lower: string): boolean {
+  return (
+    /(opus|o1|o3|o4|pro|deep-research|thinking|01-pro|03-pro|openaio-|reasoning)/.test(lower) ||
+    /gpt-5/.test(lower) ||
+    /gpt-4(\.|)5/.test(lower) ||
+    /claude-sonnet-4(\.|5|6|7|8)/.test(lower) ||
+    /gemini-(2\.5-pro|3\.1-pro|3\.5)/.test(lower) ||
+    /deepseek-(r1|v3)/.test(lower) ||
+    /kimi-k2/.test(lower) ||
+    /nexusflux/.test(lower) ||
+    /airoboros/.test(lower)
+  );
+}
+
+/** Small: mini/flash/lite/haiku/nano (but not deep-research or pro). */
+function isSmallModel(lower: string): boolean {
+  return /(mini|flash|haiku|nano|lite|fast|small)\b/.test(lower) && !/(deep-research|pro)/.test(lower);
+}
+
+/**
+ * Classify a single model spec string into a suggested tier name.
+ *
+ * The heuristic uses the model ID (the part after the provider/ prefix)
+ * to determine whether the model is "small", "medium", or "big".
+ *
+ * @param modelSpec - A model spec string, e.g. "openai/gpt-4.1-mini" or "gpt-5".
+ * @returns The suggested tier name: "small", "medium", or "big".
+ */
+export function classifyModelSpec(modelSpec: string): string {
+  // Extract the last segment after the final "/" as the model ID.
+  // Handles both "provider/id" and "provider/provider/id" patterns.
+  const id = modelSpec.includes("/") ? modelSpec.split("/").pop()! : modelSpec;
+  const lower = id.toLowerCase();
+
+  if (isBigModel(lower)) return "big";
+  if (isSmallModel(lower)) return "small";
+  return "medium";
+}
+
+/**
+ * Classify a list of available model specs into tiers.
+ *
+ * Maps each model to a suggested tier ("small", "medium", "big")
+ * using the same heuristic as `classifyModelSpec()`. Only non-empty
+ * tiers are included in the result.
+ *
+ * @param availableModels - Array of model spec strings.
+ * @returns A map of tier name to array of model specs in that tier.
+ */
+export function classifyModelsToTiers(
+  availableModels: string[],
+): Record<string, string[]> {
+  const small: string[] = [];
+  const medium: string[] = [];
+  const big: string[] = [];
+
+  for (const spec of availableModels) {
+    const tier = classifyModelSpec(spec);
+    if (tier === "small") small.push(spec);
+    else if (tier === "big") big.push(spec);
+    else medium.push(spec);
+  }
+
+  const tiers: Record<string, string[]> = {};
+  if (small.length > 0) tiers.small = small;
+  if (medium.length > 0) tiers.medium = medium;
+  if (big.length > 0) tiers.big = big;
+
+  return tiers;
+}
+
+// ---------------------------------------------------------------------------
 // Defaults
 // ---------------------------------------------------------------------------
 
@@ -50,52 +126,11 @@ export interface ModelTierConfig {
  */
 export function buildDefaultTierConfig(): ModelTierConfig {
   const available = listAvailableModelSpecs();
-  const small: string[] = [];
-  const medium: string[] = [];
-  const big: string[] = [];
-
-  for (const spec of available) {
-    const id = spec.includes("/") ? spec.split("/")[1] : spec;
-    const lower = id.toLowerCase();
-
-    // Big: top reasoning/thinking models
-    if (
-      /(opus|o1|o3|o4|pro|deep-research|thinking|01-pro|03-pro|openaio-|reasoning)/.test(lower) ||
-      /gpt-5/.test(lower) ||
-      /gpt-4(\.|)5/.test(lower) ||
-      /claude-sonnet-4(\.|5|6|7|8)/.test(lower) ||
-      /gemini-(2\.5-pro|3\.1-pro|3\.5)/.test(lower) ||
-      /deepseek-(r1|v3)/.test(lower) ||
-      /kimi-k2/.test(lower) ||
-      /nexusflux/.test(lower) ||
-      /airoboros/.test(lower)
-    ) {
-      big.push(spec);
-    }
-    // Small: mini/flash/lite/haiku/nano
-    else if (
-      /(mini|flash|haiku|nano|lite|fast|small)\b/.test(lower) &&
-      !/(deep-research|pro)/.test(lower)
-    ) {
-      small.push(spec);
-    }
-    // Everything else is medium
-    else {
-      medium.push(spec);
-    }
-  }
-
-  // Prefer provider-friendly ordering: put the user's default provider first
-  const tiers: Record<string, string[]> = {};
-  if (small.length > 0) tiers.small = small;
-  if (medium.length > 0) tiers.medium = medium;
-  if (big.length > 0) tiers.big = big;
+  const tiers = classifyModelsToTiers(available);
 
   // Fallback: if classification produced empty tiers, put everything in medium
   if (Object.keys(tiers).length === 0) {
-    tiers.medium = [...available];
-    tiers.small = [...available];
-    tiers.big = [...available];
+    return { tiers: { small: [...available], medium: [...available], big: [...available] } };
   }
 
   return { tiers };

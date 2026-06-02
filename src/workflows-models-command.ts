@@ -12,6 +12,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { listAvailableModelSpecs } from "./agent.js";
 import {
   buildDefaultTierConfig,
+  classifyModelSpec,
   formatTierConfig,
   loadModelTierConfig,
   saveModelTierConfig,
@@ -119,21 +120,41 @@ async function editTier(
 ): Promise<Record<string, string[]> | null> {
   const available = listAvailableModelSpecs();
   let current = [...(tiers[tierName] ?? [])];
+  let showAll = false;
 
   // eslint-disable-next-line no-constant-condition
   while (true) {
     const currentStr = current.length > 0 ? current.join(", ") : "(empty)";
-    const modelOptions = available.map((m) => {
+
+    // Filter models by tier classification so each tier editor only shows
+    // models appropriate for that tier. User can toggle to see all models.
+    const visible = showAll
+      ? available
+      : available.filter((m) => classifyModelSpec(m) === tierName);
+
+    const modelOptions = visible.map((m) => {
       const selected = current.includes(m);
       return `${selected ? "✓" : "○"} ${m}`;
     });
 
+    const viewLabel = showAll
+      ? "Showing all models"
+      : `Showing ${tierName} models only`;
+
     const options: string[] = [
       `Current: ${currentStr}`,
+      viewLabel,
       "─".repeat(30),
       ...modelOptions,
       "─".repeat(30),
     ];
+
+    // Toggle view mode
+    if (showAll) {
+      options.push(`Show only ${tierName} models`);
+    } else {
+      options.push("Show all models");
+    }
 
     if (current.length > 0) {
       options.push("Clear all");
@@ -156,6 +177,16 @@ async function editTier(
         current = [];
         ctx.ui.notify(`"${tierName}" tier cleared.`, "info");
       }
+      continue;
+    }
+
+    if (choice === "Show all models") {
+      showAll = true;
+      continue;
+    }
+
+    if (choice === `Show only ${tierName} models`) {
+      showAll = false;
       continue;
     }
 
