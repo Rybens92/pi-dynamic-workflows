@@ -94,8 +94,9 @@ export function registerWorkflowModelsCommand(pi: ExtensionAPI): void {
 /**
  * Interactive editor for a single tier — single-select model picker.
  *
- * Shows ALL available models like Pi's `/model` command.
- * The currently selected model is marked with "→".
+ * Shows ALL available models as-is (no prefixes — Pi's native
+ * `ctx.ui.select()` already renders a focus indicator).
+ * The currently selected model is shown in the dialog title.
  * User picks one model or selects "Done" to return.
  *
  * Returns the updated tiers object, or null if nothing changed.
@@ -113,15 +114,10 @@ export async function editSingleTier(
   const available = listAvailableModelSpecs();
   const current = tiers[tierName];
 
-  // Build a single-select model list like Pi's /model command:
-  // currently selected model gets "→" prefix, others get "  " prefix
-  // The full provider/model spec is shown for clarity.
-  const modelOptions = available.map((m) => {
-    return m === current ? `→ ${m}` : `  ${m}`;
-  });
-
+  // Show ALL available models with no prefix — Pi's native select
+  // handles focus highlighting. The current selection is in the title.
   const options: string[] = [
-    ...modelOptions,
+    ...available,
     "──",
     "Done",
   ];
@@ -133,13 +129,9 @@ export async function editSingleTier(
 
   if (!choice || choice === "Done") return null;
 
-  // Extract model name from "→ provider/model" or "  provider/model"
-  const modelMatch = choice.match(/^(?:→ | {2})(.+)$/);
-  if (!modelMatch) return null;
+  // choice is the raw model spec string
+  if (choice === current) return null; // no change
 
-  const modelSpec = modelMatch[1];
-  if (modelSpec === current) return null; // no change
-
-  ctx.ui.notify(`"${tierName}" tier → ${modelSpec}`, "info");
-  return { ...tiers, [tierName]: modelSpec };
+  ctx.ui.notify(`"${tierName}" tier → ${choice}`, "info");
+  return { ...tiers, [tierName]: choice };
 }

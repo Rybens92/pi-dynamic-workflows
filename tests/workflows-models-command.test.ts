@@ -97,8 +97,8 @@ describe("workflows-models-command", () => {
       const ctx = {
         ui: {
           select: mock.fn(async (_title: string, opts: string[]) => {
-            const currentOpt = opts.find((o) => o.startsWith("→ "));
-            return currentOpt;
+            // Return the current model as the selection (it appears in the list)
+            return "gpt-4.1-mini";
           }),
           notify: mock.fn(),
         },
@@ -115,9 +115,8 @@ describe("workflows-models-command", () => {
       const ctx = {
         ui: {
           select: mock.fn(async (_title: string, opts: string[]) => {
-            // Return the first non-current model
-            const newModel = opts.find((o) => o.startsWith("  "));
-            return newModel;
+            // Return the first non-"Done" non-"──" option as the new selection
+            return opts.find((o) => o !== "Done" && o !== "──");
           }),
           notify: mock.fn(),
         },
