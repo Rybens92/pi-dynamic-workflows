@@ -58,6 +58,17 @@ export type {
 } from "./workflow.js";
 export { parseWorkflowScript, runWorkflow } from "./workflow.js";
 export { registerWorkflowCommands } from "./workflow-commands.js";
+export { registerWorkflowModelsCommand } from "./workflows-models-command.js";
+export type { ModelTierConfig } from "./model-tier-config.js";
+export {
+  buildDefaultTierConfig,
+  formatTierConfig,
+  getModelTierConfigPath,
+  loadModelTierConfig,
+  resolveTierModel,
+  saveModelTierConfig,
+  sortedTierNames,
+} from "./model-tier-config.js";
 export {
   buildForcedWorkflowPrompt,
   colorizeWorkflow,

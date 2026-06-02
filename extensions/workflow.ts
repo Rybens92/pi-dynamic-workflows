@@ -8,6 +8,7 @@ import {
   registerAllSavedWorkflows,
   registerBuiltinWorkflows,
   registerWorkflowCommands,
+  registerWorkflowModelsCommand,
   WorkflowManager,
 } from "../src/index.js";
 
@@ -21,6 +22,7 @@ export default function extension(pi: ExtensionAPI) {
   const workflowTool = createWorkflowTool({ cwd, manager, storage });
   pi.registerTool(workflowTool);
   registerWorkflowCommands(pi, manager, { storage, cwd });
+  registerWorkflowModelsCommand(pi);
   registerBuiltinWorkflows(pi, { cwd });
   registerAllSavedWorkflows(pi, cwd, storage, manager);
   // "Workflows mode": type `workflow(s)` to arm a forced workflow (animated),

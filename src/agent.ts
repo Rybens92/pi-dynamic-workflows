@@ -13,6 +13,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import type { Static, TSchema } from "typebox";
 import { createStructuredOutputTool, type StructuredOutputCapture } from "./structured-output.js";
+import { resolveTierModel, loadModelTierConfig } from "./model-tier-config.js";
 
 export interface WorkflowAgentOptions {
   cwd?: string;
@@ -68,6 +69,15 @@ export interface AgentRunOptions<TSchemaDef extends TSchema | undefined = undefi
    * a warning is logged. When omitted, the session default applies.
    */
   model?: string;
+  /**
+   * Model tier name (e.g. "small", "medium", "big"). When set, the model is
+   * resolved from the user's model-tiers.json config before `run()` starts.
+   * Takes priority over `model` when both are provided — the tier is resolved
+   * first, and if it yields a concrete model, that model is used instead of
+   * the `model` field. This lets workflow scripts use `{ tier: "small" }`
+   * without caring which concrete model backs that tier.
+   */
+  tier?: string;
   /** Called with the resolved model id once known (for display/telemetry). */
   onModelResolved?: (modelId: string) => void;
   /** Run this agent in a different working directory (e.g. an isolated worktree). */
@@ -133,15 +143,34 @@ export class WorkflowAgent {
       customTools.push(createStructuredOutputTool({ schema: options.schema, capture }) as unknown as ToolDefinition);
     }
 
+    // Resolve tier (if set) → concrete model spec, then resolve to a Model object.
+    // Tier takes priority over explicit model: if the tier resolves to a model,
+    // that model is used even when `options.model` is also set.
+    let resolvedModelSpec: string | undefined;
+    if (options.tier) {
+      const tierConfig = loadModelTierConfig();
+      if (tierConfig) {
+        resolvedModelSpec = resolveTierModel(options.tier, tierConfig);
+        if (!resolvedModelSpec) {
+          console.warn(`[workflow] tier "${options.tier}" has no available model; falling back`);
+        }
+      } else {
+        console.warn(`[workflow] no model-tiers config found; ignoring tier "${options.tier}"`);
+      }
+    }
+
+    // Fall back to explicit model spec when tier didn't resolve
+    const modelSpec = resolvedModelSpec ?? options.model;
+
     // Resolve a requested model spec to a Model object. A given-but-unresolved
     // spec falls back to the session default (with a warning) rather than failing.
     let resolvedModel: Model<any> | undefined;
-    if (options.model) {
-      resolvedModel = this.resolveModel(options.model);
+    if (modelSpec) {
+      resolvedModel = this.resolveModel(modelSpec);
       if (resolvedModel) {
         options.onModelResolved?.(`${resolvedModel.provider}/${resolvedModel.id}`);
       } else {
-        console.warn(`[workflow] model "${options.model}" not found; using session default`);
+        console.warn(`[workflow] model "${modelSpec}" not found; using session default`);
       }
     }
 
