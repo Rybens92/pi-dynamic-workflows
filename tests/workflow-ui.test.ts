@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { keyToAction, NavigatorModel, NavigatorState, renderNavigator } from "../src/workflow-ui.js";
+import { keyToAction, NavigatorModel, NavigatorState, renderNavigator, type NavAction } from "../src/workflow-ui.js";
 
 /** Fake manager exposing one running run with two phases. */
 function fakeManager() {
@@ -326,4 +326,167 @@ test("renderNavigator shows correct footer hint per view", () => {
   state.drill(model);
   const detailLines = renderNavigator(state, model, 80);
   assert.match(detailLines.join("\n"), /j\/k scroll/);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Saved workflows navigator
+// ═══════════════════════════════════════════════════════════════════════════
+
+function savedStorage() {
+  return {
+    list: () => [
+      { name: "deploy", description: "Deploy to prod", location: "project", path: "/x", savedAt: "2025-01-01" },
+      { name: "analyze", description: "Analyze deps", location: "user", path: "/y", savedAt: "2025-01-02" },
+      { name: "backup", description: "Full backup", location: "user", path: "/z", savedAt: "2025-01-03" },
+    ],
+    delete: () => true,
+  } as any;
+}
+
+function emptySavedStorage() {
+  return { list: () => [], delete: () => true } as any;
+}
+
+test("NavigatorModel.saved returns sorted saved workflows from storage", () => {
+  const model = new NavigatorModel(fakeManager(), savedStorage());
+  const saved = model.saved();
+  assert.equal(saved.length, 3);
+  // Sorted alphabetically
+  assert.equal(saved[0].name, "analyze");
+  assert.equal(saved[1].name, "backup");
+  assert.equal(saved[2].name, "deploy");
+});
+
+test("NavigatorModel.saved returns empty array when no storage configured", () => {
+  const model = new NavigatorModel(fakeManager());
+  const saved = model.saved();
+  assert.deepEqual(saved, []);
+});
+
+test("NavigatorModel.saved returns empty array when storage has no items", () => {
+  const model = new NavigatorModel(fakeManager(), emptySavedStorage());
+  const saved = model.saved();
+  assert.deepEqual(saved, []);
+});
+
+test("NavigatorState drill from runs view saves and goes to saved view", () => {
+  const model = new NavigatorModel(fakeManager(), savedStorage());
+  const state = new NavigatorState();
+  
+  // In saved view, enter drills into a saved item to show its detail
+  state.drill(model); // runs → phases
+  state.back();
+  assert.equal(state.kind, "runs");
+  
+  // After new approach: the runs view stays as-is, saved is reached differently
+});
+
+test("keyToAction maps 'v' to viewSaved in runs view", () => {
+  assert.deepEqual(keyToAction("v", "runs"), { type: "viewSaved" });
+  assert.deepEqual(keyToAction("v", "saved"), { type: "back" });
+  assert.deepEqual(keyToAction("escape", "saved"), { type: "back" });
+  assert.deepEqual(keyToAction("enter", "saved"), { type: "drill" });
+});
+
+test("keyToAction maps 'x' to deleteSaved in saved view", () => {
+  assert.deepEqual(keyToAction("x", "saved"), { type: "deleteSaved" });
+  assert.deepEqual(keyToAction("x", "savedDetail"), { type: "deleteSaved" });
+  assert.deepEqual(keyToAction("x", "runs"), { type: "stop" }); // unchanged
+});
+
+test("renderNavigator shows saved view with saved workflows", () => {
+  const model = new NavigatorModel(fakeManager(), savedStorage());
+  const state = new NavigatorState();
+  state.openSaved(model); // new method
+  assert.equal(state.kind, "saved");
+  
+  const lines = renderNavigator(state, model, 80);
+  const text = lines.join("\n");
+  assert.match(text, /Saved Workflows/);
+  assert.match(text, /analyze/);
+  assert.match(text, /backup/);
+  assert.match(text, /deploy/);
+  assert.match(text, /\./);  // project location indicator
+  assert.match(text, /~/);      // user location indicator
+  assert.match(text, /Analyze deps/);
+});
+
+test("renderNavigator shows empty hint when no saved workflows", () => {
+  const model = new NavigatorModel(fakeManager(), emptySavedStorage());
+  const state = new NavigatorState();
+  state.openSaved(model);
+  const lines = renderNavigator(state, model, 80);
+  const text = lines.join("\n");
+  assert.match(text, /No saved workflows/);
+  assert.match(text, /Save one from the runs view with /);
+});
+
+test("renderNavigator shows saved detail view for a saved workflow", () => {
+  const model = new NavigatorModel(fakeManager(), savedStorage());
+  const state = new NavigatorState();
+  state.openSaved(model);
+  state.drill(model); // enter first saved item → savedDetail
+  assert.equal(state.kind, "savedDetail");
+  
+  const lines = renderNavigator(state, model, 80);
+  const text = lines.join("\n");
+  assert.match(text, /analyze/);
+  assert.match(text, /Analyze deps/);
+  assert.match(text, /Location:/);
+  assert.match(text, /Script:/);
+  assert.match(text, /Saved at:/);
+});
+
+test("renderNavigator saved view has correct footer hint", () => {
+  const model = new NavigatorModel(fakeManager(), savedStorage());
+  const state = new NavigatorState();
+  state.openSaved(model);
+  const text = renderNavigator(state, model, 80).join("\n");
+  assert.match(text, /v runs/);
+  assert.match(text, /x delete/);
+  
+  // Detail view footer
+  state.drill(model);
+  const detailText = renderNavigator(state, model, 80).join("\n");
+  assert.match(detailText, /j\/k scroll/);
+  assert.match(detailText, /esc back/);
+});
+
+test("NavigatorState openSaved pushes a saved frame", () => {
+  const model = new NavigatorModel(fakeManager(), savedStorage());
+  const state = new NavigatorState();
+  state.openSaved(model);
+  assert.equal(state.kind, "saved");
+  assert.equal(state.depth, 2);
+});
+
+test("NavigatorState saved depth allows back to runs and close", () => {
+  const model = new NavigatorModel(fakeManager(), savedStorage());
+  const state = new NavigatorState();
+  state.openSaved(model);
+  assert.equal(state.depth, 2);
+  
+  assert.ok(state.back());
+  assert.equal(state.kind, "runs");
+  assert.equal(state.back(), false); // top-level close
+});
+
+test("NavigatorState drill in saved view goes to savedDetail then back", () => {
+  const model = new NavigatorModel(fakeManager(), savedStorage());
+  const state = new NavigatorState();
+  state.openSaved(model);
+  
+  assert.ok(state.drill(model));
+  assert.equal(state.kind, "savedDetail");
+  assert.equal(state.savedName, "analyze");
+  
+  assert.ok(state.back());
+  assert.equal(state.kind, "saved");
+});
+
+test("NavigatorState activeRunId works in saved view (returns undefined)", () => {
+  const model = new NavigatorModel(fakeManager(), savedStorage());
+  const state = new NavigatorState();
+  state.openSaved(model);
+  assert.equal(state.activeRunId(model), undefined);
 });

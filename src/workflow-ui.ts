@@ -3,9 +3,10 @@
  *
  *   runs ──enter──▶ phases ──enter──▶ agents ──enter──▶ agent detail
  *        ◀──esc───        ◀──esc────         ◀──esc────
+ *                     'v' ──▶ saved ──enter──▶ saved detail
  *
  * Keys: ↑/↓ (or j/k) select · enter/→ drill in · esc/← back (esc at top closes)
- *       p pause/resume · x stop · r restart · s save · q quit
+ *       p pause/resume · x stop · r restart · 'v' saved · q quit
  *
  * The state machine and line rendering are pure and unit-tested; the pi-tui
  * Component shell (openWorkflowNavigator) wires them to live manager events.
@@ -18,7 +19,7 @@ import type { WorkflowAgentSnapshot, WorkflowSnapshot } from "./display.js";
 import type { PersistedRunState } from "./run-persistence.js";
 import { registerSavedWorkflow } from "./saved-commands.js";
 import type { WorkflowManager } from "./workflow-manager.js";
-import type { WorkflowStorage } from "./workflow-saved.js";
+import type { SavedWorkflow, WorkflowStorage } from "./workflow-saved.js";
 
 const STATUS_ICON: Record<string, string> = {
   pending: "·",
@@ -41,7 +42,7 @@ export interface ThemeLike {
 
 const PLAIN: ThemeLike = { fg: (_c, t) => t, bold: (t) => t };
 
-export type ViewKind = "runs" | "phases" | "agents" | "detail";
+export type ViewKind = "runs" | "phases" | "agents" | "detail" | "saved" | "savedDetail";
 
 interface RunRow {
   runId: string;
@@ -75,7 +76,10 @@ function shortModel(model: string | undefined): string | undefined {
 
 /** Reads run/phase/agent data from the manager, preferring live snapshots. */
 export class NavigatorModel {
-  constructor(private readonly manager: Pick<WorkflowManager, "listRuns" | "getRun">) {}
+  constructor(
+    private readonly manager: Pick<WorkflowManager, "listRuns" | "getRun">,
+    private readonly storage?: { list(): SavedWorkflow[]; delete(name: string, location?: string): boolean },
+  ) {}
 
   private snapshot(runId: string): { snapshot: WorkflowSnapshot; status: string } | undefined {
     const live = this.manager.getRun(runId);
@@ -98,6 +102,18 @@ export class NavigatorModel {
         tokens: (live?.snapshot.tokenUsage ?? p.tokenUsage)?.total ?? 0,
       };
     });
+  }
+
+  /** Return saved workflows sorted by name, or [] when no storage configured. */
+  saved(): SavedWorkflow[] {
+    if (!this.storage) return [];
+    return this.storage.list().sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /** Delete a saved workflow by name from the configured storage. */
+  deleteSaved(name: string): boolean {
+    if (!this.storage) return false;
+    return this.storage.delete(name);
   }
 
   runName(runId: string): string {
@@ -143,6 +159,15 @@ export class NavigatorModel {
   }
 }
 
+type StackFrame = {
+  kind: ViewKind;
+  cursor: number;
+  runId?: string;
+  phase?: string;
+  agentId?: number;
+  savedName?: string;
+};
+
 function persistedToSnapshot(p: PersistedRunState): WorkflowSnapshot {
   return {
     name: p.workflowName,
@@ -171,12 +196,10 @@ function persistedToSnapshot(p: PersistedRunState): WorkflowSnapshot {
 
 /** Navigation state machine: a stack of (view, cursor) frames plus detail scroll. */
 export class NavigatorState {
-  private stack: Array<{ kind: ViewKind; cursor: number; runId?: string; phase?: string; agentId?: number }> = [
-    { kind: "runs", cursor: 0 },
-  ];
+  private stack: StackFrame[] = [{ kind: "runs", cursor: 0 }];
   scroll = 0;
 
-  private top() {
+  private top(): StackFrame {
     return this.stack[this.stack.length - 1];
   }
   get kind(): ViewKind {
@@ -194,6 +217,10 @@ export class NavigatorState {
   get agentId(): number | undefined {
     return this.top().agentId;
   }
+  /** The saved workflow name at the cursor in savedDetail view */
+  get savedName(): string | undefined {
+    return this.top().savedName;
+  }
   get depth(): number {
     return this.stack.length;
   }
@@ -205,13 +232,18 @@ export class NavigatorState {
   }
 
   move(delta: number, count: number) {
-    if (this.kind === "detail") {
+    if (this.kind === "detail" || this.kind === "savedDetail") {
       this.scroll = Math.max(0, this.scroll + delta);
       return;
     }
     if (count <= 0) return;
     const t = this.top();
     t.cursor = (t.cursor + delta + count) % count;
+  }
+
+  /** Open saved workflows view (reached from runs view with 'v'). */
+  openSaved(model: NavigatorModel): void {
+    this.stack.push({ kind: "saved", cursor: 0 });
   }
 
   /** Drill into the selected item. Returns true if the view changed. */
@@ -237,6 +269,14 @@ export class NavigatorState {
       if (!ag) return false;
       this.scroll = 0;
       this.stack.push({ kind: "detail", cursor: 0, runId: t.runId, phase: t.phase, agentId: ag.id });
+      return true;
+    }
+    if (t.kind === "saved") {
+      const saved = model.saved();
+      const item = saved[t.cursor];
+      if (!item) return false;
+      this.scroll = 0;
+      this.stack.push({ kind: "savedDetail", cursor: 0, savedName: item.name });
       return true;
     }
     return false;
@@ -323,6 +363,34 @@ export function renderNavigator(
       state.scroll = Math.min(state.scroll, maxScroll);
       lines.push(...body.slice(state.scroll));
     }
+  } else if (state.kind === "saved") {
+    const saved = model.saved();
+    state.clamp(saved.length);
+    lines.push(theme.bold("Saved Workflows"));
+    if (!saved.length) {
+      lines.push(dim("  No saved workflows yet. Save one from the runs view with 's'."));
+    }
+    saved.forEach((w, i) => {
+      const loc = w.location === "user" ? "~" : ".";
+      const meta = dim(`${loc} · ${w.description ? w.description : "(no description)"}`);
+      lines.push(sel(i, `${w.name}  ${meta}`));
+    });
+  } else if (state.kind === "savedDetail" && state.savedName) {
+    const saved = model.saved();
+    const w = saved.find((s) => s.name === state.savedName);
+    lines.push(theme.bold(w ? w.name : "saved workflow"));
+    if (w) {
+      const body: string[] = [];
+      if (w.description) body.push(dim("Description: ") + w.description);
+      body.push(dim("Location: ") + (w.location === "user" ? "user (~/.pi)" : "project (.pi)"));
+      body.push(dim("Saved at: ") + w.savedAt);
+      if (w.parameters) body.push(dim("Parameters: ") + JSON.stringify(w.parameters));
+      body.push("", dim("Script:"));
+      body.push(...wrap(w.script, width));
+      const maxScroll = Math.max(0, body.length - 1);
+      state.scroll = Math.min(state.scroll, maxScroll);
+      lines.push(...body.slice(state.scroll));
+    }
   }
 
   lines.push("");
@@ -331,10 +399,18 @@ export function renderNavigator(
 }
 
 function footerHint(state: NavigatorState, theme: ThemeLike): string {
-  const parts =
-    state.kind === "detail"
-      ? ["j/k scroll", "esc back"]
-      : ["↑/↓ select", "enter open", "esc back", "p pause", "x stop", "r restart", "s save", "q quit"];
+  const parts: string[] = [];
+  switch (state.kind) {
+    case "detail":
+    case "savedDetail":
+      parts.push("j/k scroll", "esc back");
+      break;
+    case "saved":
+      parts.push("↑/↓ select", "enter open", "v runs", "x delete", "esc back");
+      break;
+    default:
+      parts.push("↑/↓ select", "enter open", "esc back", "p pause", "x stop", "r restart", "s save", "v saved", "q quit");
+  }
   return theme.fg("dim", parts.join(" · "));
 }
 
@@ -366,6 +442,8 @@ export type NavAction =
   | { type: "stop" }
   | { type: "restart" }
   | { type: "save" }
+  | { type: "viewSaved" }
+  | { type: "deleteSaved" }
   | { type: "none" };
 
 export function keyToAction(keyId: string | undefined, kind: ViewKind): NavAction {
@@ -381,7 +459,8 @@ export function keyToAction(keyId: string | undefined, kind: ViewKind): NavActio
     case "enter":
     case "return":
     case "right":
-      return kind === "detail" ? { type: "none" } : { type: "drill" };
+      if (kind === "detail" || kind === "savedDetail") return { type: "none" };
+      return { type: "drill" };
     case "escape":
     case "esc":
     case "left":
@@ -391,11 +470,15 @@ export function keyToAction(keyId: string | undefined, kind: ViewKind): NavActio
     case "p":
       return { type: "pause" };
     case "x":
+      if (kind === "saved" || kind === "savedDetail") return { type: "deleteSaved" };
       return { type: "stop" };
     case "r":
       return { type: "restart" };
     case "s":
       return { type: "save" };
+    case "v":
+      if (kind === "runs") return { type: "viewSaved" };
+      return { type: "back" }; // 'v' in saved view goes back to runs
     default:
       return { type: "none" };
   }
@@ -405,6 +488,7 @@ function currentCount(state: NavigatorState, model: NavigatorModel): number {
   if (state.kind === "runs") return model.runs().length;
   if (state.kind === "phases" && state.runId) return model.phases(state.runId).length;
   if (state.kind === "agents" && state.runId && state.phase) return model.agents(state.runId, state.phase).length;
+  if (state.kind === "saved") return model.saved().length;
   return 0;
 }
 
@@ -423,7 +507,7 @@ export function openWorkflowNavigator(
   ui: ExtensionUIContext,
   opts: NavigatorOptions = {},
 ): Promise<void> {
-  const model = new NavigatorModel(manager);
+  const model = new NavigatorModel(manager, opts.storage);
   const state = new NavigatorState();
 
   return ui.custom<void>(
@@ -455,6 +539,24 @@ export function openWorkflowNavigator(
             cleanup();
             done();
             return;
+          case "viewSaved":
+            state.openSaved(model);
+            break;
+          case "deleteSaved": {
+            if (state.kind === "saved") {
+              const saved = model.saved();
+              const item = saved[state.cursor];
+              if (item) {
+                model.deleteSaved(item.name);
+                ui.notify(`Deleted /${item.name}`, "info");
+              }
+            } else if (state.kind === "savedDetail" && state.savedName) {
+              model.deleteSaved(state.savedName);
+              ui.notify(`Deleted /${state.savedName}`, "info");
+              state.back(); // Go back to saved list after delete
+            }
+            break;
+          }
           case "pause": {
             const id = state.activeRunId(model);
             if (id) ui.notify(manager.pause(id) ? `Paused ${id}` : `Cannot pause ${id}`, "info");
