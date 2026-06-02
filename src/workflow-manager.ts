@@ -134,8 +134,13 @@ export class WorkflowManager extends EventEmitter {
       updatedAt: managed.startedAt.toISOString(),
     });
 
-    // Run workflow asynchronously
+    // Run workflow asynchronously.
+    // Attach a side-channel catch to prevent Node.js unhandled-rejection crashes
+    // when a workflow is aborted/paused/stopped — executeRun()'s catch block
+    // already records status/event/persist, but the promise still rejects.
+    // The original promise is returned so callers can await it in try/catch.
     const promise = this.executeRun(managed, script, args);
+    promise.catch(() => {});
 
     return { runId, promise };
   }
@@ -277,7 +282,10 @@ export class WorkflowManager extends EventEmitter {
             );
 
       if (managed.controller.signal.aborted) {
-        managed.status = "aborted";
+        // Intentional abort (pause/stop/Esc) — preserve status set by pause()/stop()
+        if (managed.status === "running") {
+          managed.status = "aborted";
+        }
       } else {
         managed.status = "failed";
       }
