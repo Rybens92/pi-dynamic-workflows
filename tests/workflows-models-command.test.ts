@@ -8,7 +8,7 @@
 import { describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
-import { existsSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 
 async function loadCommand() {
@@ -97,7 +97,6 @@ describe("workflows-models-command", () => {
       const ctx = {
         ui: {
           select: mock.fn(async (_title: string, opts: string[]) => {
-            // Return the option that has the current model with "→"
             const currentOpt = opts.find((o) => o.startsWith("→ "));
             return currentOpt;
           }),
@@ -110,23 +109,25 @@ describe("workflows-models-command", () => {
       assert.equal(result, null); // no change
     });
 
-    it("handles Clear action by removing the tier entry", async () => {
+    it("selects a different model and returns updated tiers", async () => {
       const { editSingleTier } = await import("../src/workflows-models-command.js");
+      // Simulate selecting a different model
       const ctx = {
         ui: {
           select: mock.fn(async (_title: string, opts: string[]) => {
-            // First call returns "Clear"
-            return "Clear";
+            // Return the first non-current model
+            const newModel = opts.find((o) => o.startsWith("  "));
+            return newModel;
           }),
           notify: mock.fn(),
         },
       };
-      const tiers: Record<string, string> = { small: "gpt-4.1-mini", medium: "gpt-4.1" };
+      const tiers: Record<string, string> = { small: "gpt-4.1-mini" };
 
       const result = await editSingleTier(ctx as never, tiers, "small");
       assert.ok(result, "should return updated tiers");
-      assert.equal(result.small, undefined, "small tier should be removed");
-      assert.equal(result.medium, "gpt-4.1", "medium tier should remain");
+      assert.notEqual(result.small, "gpt-4.1-mini", "should have changed model");
+      assert.equal(typeof result.small, "string", "should still be a string");
     });
   });
 

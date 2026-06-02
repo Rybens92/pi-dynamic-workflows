@@ -94,10 +94,9 @@ export function registerWorkflowModelsCommand(pi: ExtensionAPI): void {
 /**
  * Interactive editor for a single tier — single-select model picker.
  *
- * Shows ALL available models, marks the currently selected one with "→".
- * This is the same interaction pattern as Pi's `/model` command.
- *
- * Includes "Clear" (remove the model from this tier) and "Done" (return).
+ * Shows ALL available models like Pi's `/model` command.
+ * The currently selected model is marked with "→".
+ * User picks one model or selects "Done" to return.
  *
  * Returns the updated tiers object, or null if nothing changed.
  */
@@ -114,39 +113,25 @@ export async function editSingleTier(
   const available = listAvailableModelSpecs();
   const current = tiers[tierName];
 
-  const currentStr = current ?? "(none)";
-
-  // Build a single-select model list: currently selected gets "→" prefix
+  // Build a single-select model list like Pi's /model command:
+  // currently selected model gets "→" prefix, others get "  " prefix
+  // The full provider/model spec is shown for clarity.
   const modelOptions = available.map((m) => {
     return m === current ? `→ ${m}` : `  ${m}`;
   });
 
   const options: string[] = [
-    `Current: ${currentStr}`,
-    "─".repeat(30),
     ...modelOptions,
-    "─".repeat(30),
-    "Clear",
+    "──",
     "Done",
   ];
 
-  const choice = await ctx.ui.select(`Pick a model for "${tierName}" tier`, options);
+  const title = current
+    ? `Pick a model for "${tierName}" (current: ${current})`
+    : `Pick a model for "${tierName}"`;
+  const choice = await ctx.ui.select(title, options);
 
   if (!choice || choice === "Done") return null;
-
-  if (choice === "Clear") {
-    if (current === undefined) {
-      ctx.ui.notify(`"${tierName}" tier already has no model assigned.`, "info");
-      return null;
-    }
-    // Build a new tiers object without this key to "clear" it
-    const newTiers: Record<string, string> = {};
-    for (const [k, v] of Object.entries(tiers)) {
-      if (k !== tierName) newTiers[k] = v;
-    }
-    ctx.ui.notify(`"${tierName}" tier cleared (no model assigned).`, "info");
-    return newTiers;
-  }
 
   // Extract model name from "→ provider/model" or "  provider/model"
   const modelMatch = choice.match(/^(?:→ | {2})(.+)$/);
