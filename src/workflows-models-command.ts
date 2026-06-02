@@ -12,7 +12,6 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { listAvailableModelSpecs } from "./agent.js";
 import {
   buildDefaultTierConfig,
-  classifyModelSpec,
   formatTierConfig,
   loadModelTierConfig,
   saveModelTierConfig,
@@ -42,26 +41,27 @@ export function registerWorkflowModelsCommand(pi: ExtensionAPI): void {
         const tiers = sortedTierNames(config);
         const menuOptions: string[] = [];
 
+        menuOptions.push("─".repeat(30));
         for (const name of tiers) {
           const models = config.tiers[name];
           const summary = models.length > 0 ? models.join(", ") : "(empty)";
-          menuOptions.push(`Set ${name} → ${summary}`);
+          menuOptions.push(`${name} → [${summary}]`);
         }
-
         menuOptions.push("─".repeat(30));
+
         menuOptions.push("Reset to defaults");
         menuOptions.push(dirty ? "Save and exit" : "Exit");
 
         const choice = await ctx.ui.select(
-          "Workflows — Model Tiers",
+          "Model tier configuration",
           ["Current configuration", formatTierConfig(config), "", ...menuOptions],
         );
 
         if (!choice) break;
 
-        // Handle "Set <tier> → ..." selection
+        // Handle "<tier> → [...]" selections
         for (const name of tiers) {
-          if (choice.startsWith(`Set ${name}`)) {
+          if (choice.startsWith(`${name} → [`)) {
             const updatedTiers = await editTier(ctx, config.tiers, name);
             if (updatedTiers !== null) {
               ensureFresh({ ...config, tiers: updatedTiers });
@@ -98,6 +98,7 @@ export function registerWorkflowModelsCommand(pi: ExtensionAPI): void {
 
 /**
  * Interactive editor for a single tier's model list.
+ * Shows ALL available models with checkmarks — no heuristic filtering.
  * Loops internally so the user can add/remove multiple models before
  * returning to the parent menu. Returns updated tiers object or null.
  */
@@ -120,41 +121,23 @@ async function editTier(
 ): Promise<Record<string, string[]> | null> {
   const available = listAvailableModelSpecs();
   let current = [...(tiers[tierName] ?? [])];
-  let showAll = false;
 
   // eslint-disable-next-line no-constant-condition
   while (true) {
     const currentStr = current.length > 0 ? current.join(", ") : "(empty)";
 
-    // Filter models by tier classification so each tier editor only shows
-    // models appropriate for that tier. User can toggle to see all models.
-    const visible = showAll
-      ? available
-      : available.filter((m) => classifyModelSpec(m) === tierName);
-
-    const modelOptions = visible.map((m) => {
+    // Show ALL available models — unchecked (○) or checked (✓)
+    const modelOptions = available.map((m) => {
       const selected = current.includes(m);
       return `${selected ? "✓" : "○"} ${m}`;
     });
 
-    const viewLabel = showAll
-      ? "Showing all models"
-      : `Showing ${tierName} models only`;
-
     const options: string[] = [
       `Current: ${currentStr}`,
-      viewLabel,
       "─".repeat(30),
       ...modelOptions,
       "─".repeat(30),
     ];
-
-    // Toggle view mode
-    if (showAll) {
-      options.push(`Show only ${tierName} models`);
-    } else {
-      options.push("Show all models");
-    }
 
     if (current.length > 0) {
       options.push("Clear all");
@@ -177,16 +160,6 @@ async function editTier(
         current = [];
         ctx.ui.notify(`"${tierName}" tier cleared.`, "info");
       }
-      continue;
-    }
-
-    if (choice === "Show all models") {
-      showAll = true;
-      continue;
-    }
-
-    if (choice === `Show only ${tierName} models`) {
-      showAll = false;
       continue;
     }
 
