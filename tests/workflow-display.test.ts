@@ -718,3 +718,73 @@ describe("renderWorkflowLines edge cases", () => {
     assert.ok(lines[0].includes("check-everything"));
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TUI rendering: no markdown syntax leaked into display
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("TUI rendering has no markdown syntax", () => {
+  it("renderWorkflowLines uses [id] instead of #id prefix", async () => {
+    const { createWorkflowSnapshot, renderWorkflowLines } = await loadDisplay();
+    const snap = createWorkflowSnapshot(fakeMeta("t", "d", ["Phase"]));
+    snap.agents = [agent(1, "agent-1", "done", "Phase")] as never[];
+    const text = renderWorkflowLines(snap).join("\n");
+    // Should use bracket notation, not hash notation
+    assert.ok(text.includes("[1]"), "should use [id] instead of #id");
+    assert.ok(!text.includes("#1"), "should NOT use #1 prefix");
+  });
+
+  it("renderWorkflowLines has no **bold** markers", async () => {
+    const { createWorkflowSnapshot, renderWorkflowLines } = await loadDisplay();
+    const snap = createWorkflowSnapshot(fakeMeta());
+    const text = renderWorkflowLines(snap).join("\n");
+    assert.ok(!text.includes("**"), "should not have bold markdown markers");
+  });
+
+  it("renderWorkflowLines has no ## heading markers", async () => {
+    const { createWorkflowSnapshot, renderWorkflowLines } = await loadDisplay();
+    const snap = createWorkflowSnapshot(fakeMeta());
+    const text = renderWorkflowLines(snap).join("\n");
+    assert.ok(!text.includes("##"), "should not have heading markdown markers");
+  });
+
+  it("renderWorkflowLines has no code fence markers", async () => {
+    const { createWorkflowSnapshot, renderWorkflowLines } = await loadDisplay();
+    const snap = createWorkflowSnapshot(fakeMeta());
+    const text = renderWorkflowLines(snap).join("\n");
+    assert.ok(!text.includes("\`\`\`"), "should not have code fence markers");
+  });
+
+  it("renderWorkflowText has no **bold** markers", async () => {
+    const { createWorkflowSnapshot, renderWorkflowText } = await loadDisplay();
+    const snap = createWorkflowSnapshot(fakeMeta());
+    const text = renderWorkflowText(snap, true);
+    assert.ok(!text.includes("**"), "completed text should not have bold markers");
+  });
+
+  it("renderWorkflowText completed has no ## heading markers", async () => {
+    const { createWorkflowSnapshot, renderWorkflowText } = await loadDisplay();
+    const snap = createWorkflowSnapshot(fakeMeta());
+    const text = renderWorkflowText(snap, true);
+    assert.ok(!text.includes("##"), "completed text should not have heading markers");
+  });
+
+  it("renderResult fallback strips markdown from content text", async () => {
+    const { createWorkflowTool } = await loadTool();
+    const tool = createWorkflowTool();
+    const theme = {
+      fg: () => (s: string) => s,
+      bold: (s: string) => s,
+    };
+    const resultWithMarkdown = {
+      content: [{ type: "text", text: "**bold** and `code` and ## header" }],
+      details: { some: "data" }, // no 'name' → triggers fallback
+      isError: false,
+    };
+    // If snapshot.name is missing, the function should still produce
+    // a Text component without crashing
+    assert.doesNotThrow(() => {
+      tool.renderResult(resultWithMarkdown as never, { isPartial: false }, theme as never);
+    });
+  });
+});

@@ -174,7 +174,7 @@ export function renderWorkflowLines(snapshot: WorkflowSnapshot, options: Workflo
 
     const visibleAgents = agents.slice(-maxAgents);
     for (const agent of visibleAgents) {
-      const order = `#${agent.id}`;
+      const order = `[${agent.id}]`;
       const result = showResultPreviews && agent.resultPreview ? ` — ${agent.resultPreview}` : "";
       const agentTokens = agent.tokens ? ` [${agent.tokens.toLocaleString()} tok]` : "";
       lines.push(`    ${order} ${statusIcon(agent.status)} ${shorten(agent.label, 48)}${agentTokens}${result}`);
@@ -189,7 +189,7 @@ export function renderWorkflowLines(snapshot: WorkflowSnapshot, options: Workflo
     for (const agent of unphased.slice(-maxAgents)) {
       const result = showResultPreviews && agent.resultPreview ? ` — ${agent.resultPreview}` : "";
       const agentTokens = agent.tokens ? ` [${agent.tokens.toLocaleString()} tok]` : "";
-      lines.push(`    #${agent.id} ${statusIcon(agent.status)} ${shorten(agent.label, 48)}${agentTokens}${result}`);
+      lines.push(`    [${agent.id}] ${statusIcon(agent.status)} ${shorten(agent.label, 48)}${agentTokens}${result}`);
     }
   }
 

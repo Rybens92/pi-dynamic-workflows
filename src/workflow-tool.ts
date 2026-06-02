@@ -226,8 +226,13 @@ export function createWorkflowTool(options: WorkflowToolOptions = {}): ToolDefin
       if (snapshot?.name) {
         return new Text(renderWorkflowText(snapshot, !isPartial), 0, 0);
       }
+      // Fallback: strip markdown syntax so the TUI doesn't display raw asterisks/hashes.
+      // The `content` field is for the LLM (where markdown is preserved), but the TUI
+      // renderer (Text component) shows text literally — so we strip markdown here.
       const text = result.content?.[0];
-      return new Text(text?.type === "text" ? text.text : theme.fg("muted", "workflow"), 0, 0);
+      const raw = text?.type === "text" ? text.text : theme.fg("muted", "workflow");
+      const clean = raw.replace(/\*\*/g, "").replace(/\*\*(\S)/g, "$1").replace(/```[a-z]*\n/g, "").replace(/```/g, "").replace(/^##+\s*/gm, "").trim();
+      return new Text(clean || theme.fg("muted", "workflow"), 0, 0);
     },
   });
 }
