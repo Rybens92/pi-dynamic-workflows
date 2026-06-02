@@ -1,9 +1,9 @@
 /**
  * Tests for workflows-models-command.ts
  *
- * Since pi.registerCommand and ctx.ui are only available at runtime inside Pi,
- * these tests focus on the pure logic: command creation, the editTier helper's
- * model toggle behavior, and integration with model-tier-config functions.
+ * Since pi.registerCommand and ctx.ui functions are only available at runtime
+ * inside Pi, these tests focus on the pure logic: command creation,
+ * the editSingleTier single-select helper, and integration with model-tier-config.
  */
 import { describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
@@ -57,20 +57,97 @@ describe("workflows-models-command", () => {
     });
   });
 
-  describe("editTier model toggle logic", () => {
-    it("toggles models in and out of the tier list", async () => {
-      const { registerWorkflowModelsCommand } = await loadCommand();
-      // The editTier function is not directly exported, so we test
-      // indirectly via the command handler by checking the config
-      // that gets built.
-      // Instead, let's directly test the logic by importing the module
+  describe("editSingleTier", () => {
+    it("exports editSingleTier function", async () => {
       const mod = await import("../src/workflows-models-command.js");
-      assert.ok(mod.registerWorkflowModelsCommand, "module exports registerWorkflowModelsCommand");
+      assert.equal(typeof mod.editSingleTier, "function");
+    });
+
+    it("returns null when user selects Done", async () => {
+      const { editSingleTier } = await import("../src/workflows-models-command.js");
+      const ctx = {
+        ui: {
+          select: mock.fn(() => Promise.resolve("Done")),
+          notify: mock.fn(),
+        },
+      };
+      const tiers: Record<string, string> = { small: "gpt-4.1-mini" };
+
+      const result = await editSingleTier(ctx as never, tiers, "small");
+      assert.equal(result, null);
+    });
+
+    it("returns null when select returns undefined", async () => {
+      const { editSingleTier } = await import("../src/workflows-models-command.js");
+      const ctx = {
+        ui: {
+          select: mock.fn(() => Promise.resolve(undefined)),
+          notify: mock.fn(),
+        },
+      };
+      const tiers: Record<string, string> = { small: "gpt-4.1-mini" };
+
+      const result = await editSingleTier(ctx as never, tiers, "small");
+      assert.equal(result, null);
+    });
+
+    it("returns null when user selects the same model (no change)", async () => {
+      const { editSingleTier } = await import("../src/workflows-models-command.js");
+      // Simulate selecting the same current model
+      const ctx = {
+        ui: {
+          select: mock.fn(async (_title: string, opts: string[]) => {
+            // Return the option that has the current model with "→"
+            const currentOpt = opts.find((o) => o.startsWith("→ "));
+            return currentOpt;
+          }),
+          notify: mock.fn(),
+        },
+      };
+      const tiers: Record<string, string> = { small: "gpt-4.1-mini" };
+
+      const result = await editSingleTier(ctx as never, tiers, "small");
+      assert.equal(result, null); // no change
+    });
+
+    it("handles Clear action by removing the tier entry", async () => {
+      const { editSingleTier } = await import("../src/workflows-models-command.js");
+      const ctx = {
+        ui: {
+          select: mock.fn(async (_title: string, opts: string[]) => {
+            // First call returns "Clear"
+            return "Clear";
+          }),
+          notify: mock.fn(),
+        },
+      };
+      const tiers: Record<string, string> = { small: "gpt-4.1-mini", medium: "gpt-4.1" };
+
+      const result = await editSingleTier(ctx as never, tiers, "small");
+      assert.ok(result, "should return updated tiers");
+      assert.equal(result.small, undefined, "small tier should be removed");
+      assert.equal(result.medium, "gpt-4.1", "medium tier should remain");
     });
   });
 
   describe("integration with model-tier-config", () => {
-    it("save/load round-trip works with tier command flow", async () => {
+    it("ensureModelTierConfig creates default on fresh install", async () => {
+      const { ensureModelTierConfig } = await import(
+        "../src/model-tier-config.js"
+      );
+      const tmpDir = mkdtempSync(join(tmpdir(), "mtc-cmd-test-"));
+      const cfgPath = join(tmpDir, "model-tiers.json");
+
+      const config = ensureModelTierConfig(cfgPath);
+      assert.ok(config.tiers, "should have tiers");
+      for (const model of Object.values(config.tiers)) {
+        assert.equal(typeof model, "string", "each tier value should be a string");
+      }
+
+      rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    it("save/load round-trip works with single-model config", async () => {
       const { saveModelTierConfig, loadModelTierConfig } = await import(
         "../src/model-tier-config.js"
       );
@@ -79,29 +156,20 @@ describe("workflows-models-command", () => {
 
       const config = {
         tiers: {
-          small: ["gpt-4.1-mini"],
-          medium: ["gpt-4.1"],
-          big: ["gpt-5"],
+          small: "gpt-4.1-mini",
+          medium: "gpt-4.1",
+          big: "gpt-5",
         },
       };
 
       saveModelTierConfig(config, cfgPath);
       const loaded = loadModelTierConfig(cfgPath);
       assert.ok(loaded);
-      assert.deepEqual(loaded!.tiers.small, ["gpt-4.1-mini"]);
-      assert.deepEqual(loaded!.tiers.medium, ["gpt-4.1"]);
-      assert.deepEqual(loaded!.tiers.big, ["gpt-5"]);
+      assert.equal(loaded!.tiers.small, "gpt-4.1-mini");
+      assert.equal(loaded!.tiers.medium, "gpt-4.1");
+      assert.equal(loaded!.tiers.big, "gpt-5");
 
       rmSync(tmpDir, { recursive: true, force: true });
-    });
-
-    it("buildDefaultTierConfig works as expected", async () => {
-      const { buildDefaultTierConfig } = await import(
-        "../src/model-tier-config.js"
-      );
-      const config = buildDefaultTierConfig();
-      assert.ok(config.tiers, "should have tiers");
-      assert.ok(Object.keys(config.tiers).length > 0, "should have at least one tier");
     });
   });
 });

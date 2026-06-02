@@ -4,19 +4,24 @@
  * TDD order:
  * 1. Default config building (no file I/O)
  * 2. resolveTierModel logic
- * 3. save/load round-trip (scoped to temp dir)
- * 4. format and sorting helpers
- * 5. Corrupted file / missing tiers handling
+ * 3. ensureModelTierConfig — fresh install / existing load
+ * 4. save/load round-trip (scoped to temp dir)
+ * 5. format and sorting helpers
+ * 6. Corrupted file / missing tiers handling
+ *
+ * All tier configs are single-model-per-tier (Record<string, string>).
  */
-import { describe, it } from "node:test";
+import { describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, writeFileSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 
-// We need to mock listAvailableModelSpecs so tests are deterministic
-// without touching the real Pi agent auth.
-
+/**
+ * Available model specs used by classification tests.
+ * classifyModelsToTiers still groups models into Record<string, string[]> buckets,
+ * so FAKE_AVAILABLE stays as an array.
+ */
 const FAKE_AVAILABLE = [
   "openai/gpt-4.1-nano",
   "openai/gpt-4.1-mini",
@@ -32,10 +37,8 @@ const FAKE_AVAILABLE = [
   "openrouter/deepseek/deepseek-v4-pro",
 ];
 
-async function loadModule(availableModels?: string[]) {
-  // Stub listAvailableModelSpecs inside the module
-  const mod = await import("../src/model-tier-config.js");
-  return { ...mod };
+async function loadModule() {
+  return await import("../src/model-tier-config.js");
 }
 
 describe("model-tier-config", () => {
@@ -47,19 +50,30 @@ describe("model-tier-config", () => {
       assert.equal(typeof cfg.tiers, "object");
     });
 
+    it("each tier holds a single string (not an array)", async () => {
+      const { buildDefaultTierConfig } = await loadModule();
+      const cfg = buildDefaultTierConfig();
+      for (const [name, model] of Object.entries(cfg.tiers)) {
+        assert.equal(
+          typeof model,
+          "string",
+          `${name} tier should hold a string, got ${typeof model}`,
+        );
+        assert.ok(model.length > 0, `${name} tier model should not be empty`);
+      }
+    });
+
     it("classifies small models (mini/flash/haiku/nano/lite/small/fast)", async () => {
       const { buildDefaultTierConfig } = await loadModule();
       const cfg = buildDefaultTierConfig();
-      // small tier should exist or have reasonable defaults
       if (cfg.tiers.small) {
-        for (const m of cfg.tiers.small) {
-          const lower = m.toLowerCase();
-          const id = lower.includes("/") ? lower.split("/").pop()! : lower;
-          assert.ok(
-            /mini|flash|haiku|nano|lite|fast|small\b/.test(id) && !/(deep-research|pro)/.test(id),
-            `${m} should be classified as small`,
-          );
-        }
+        const lower = cfg.tiers.small.toLowerCase();
+        const id = lower.includes("/") ? lower.split("/").pop()! : lower;
+        assert.ok(
+          /mini|flash|haiku|nano|lite|fast|small\b/.test(id) &&
+            !/(deep-research|pro)/.test(id),
+          `${cfg.tiers.small} should be classified as small`,
+        );
       }
     });
 
@@ -67,11 +81,10 @@ describe("model-tier-config", () => {
       const { buildDefaultTierConfig } = await loadModule();
       const cfg = buildDefaultTierConfig();
       if (cfg.tiers.big) {
-        for (const m of cfg.tiers.big) {
-          const lower = m.toLowerCase();
-          const id = lower.includes("/") ? lower.split("/").pop()! : lower;
-          assert.ok(
-            /(opus|o1|o3|o4|pro|deep-research|thinking|01-pro|03-pro|openaio-|reasoning)/.test(id) ||
+        const lower = cfg.tiers.big.toLowerCase();
+        const id = lower.includes("/") ? lower.split("/").pop()! : lower;
+        assert.ok(
+          /(opus|o1|o3|o4|pro|deep-research|thinking|01-pro|03-pro|openaio-|reasoning)/.test(id) ||
             /gpt-5/.test(id) ||
             /gpt-4(\.|)5/.test(id) ||
             /claude-sonnet-4(\.|5|6|7|8)/.test(id) ||
@@ -80,9 +93,8 @@ describe("model-tier-config", () => {
             /kimi-k2/.test(id) ||
             /nexusflux/.test(id) ||
             /airoboros/.test(id),
-            `${m} should be classified as big`,
-          );
-        }
+          `${cfg.tiers.big} should be classified as big`,
+        );
       }
     });
 
@@ -91,96 +103,112 @@ describe("model-tier-config", () => {
       const cfg = buildDefaultTierConfig();
       assert.ok(Object.keys(cfg.tiers).length > 0, "should have at least one tier");
     });
-
-    it("every model appears in exactly one tier", async () => {
-      const { buildDefaultTierConfig } = await loadModule();
-      const cfg = buildDefaultTierConfig();
-      const all: string[] = Object.values(cfg.tiers).flat();
-      const unique = new Set(all);
-      assert.equal(all.length, unique.size, "no model should appear in multiple tiers");
-    });
   });
 
   describe("resolveTierModel", () => {
-    it("returns a model for a valid tier", async () => {
+    it("returns the model for a valid tier", async () => {
       const { resolveTierModel } = await loadModule();
       const config = {
         tiers: {
-          small: ["openai/gpt-4.1-mini", "haiku"],
-          medium: ["openai/gpt-4.1"],
-          big: ["openai/gpt-5", "claude-opus-4"],
+          small: "openai/gpt-4.1-mini",
+          medium: "openai/gpt-4.1",
+          big: "openai/gpt-5",
         },
       };
-      const result = resolveTierModel("small", config, FAKE_AVAILABLE);
-      assert.ok(result, "should resolve a model for small");
-      assert.ok(FAKE_AVAILABLE.includes(result!), `${result} should be in available list`);
-    });
-
-    it("returns first available model from the tier list", async () => {
-      const { resolveTierModel } = await loadModule();
-      const config = {
-        tiers: {
-          small: ["nonexistent-model", "gpt-4.1-mini", "haiku"],
-        },
-      };
-      const result = resolveTierModel("small", config, FAKE_AVAILABLE);
-      assert.equal(result, "gpt-4.1-mini", "should skip unavailable and return first available");
+      assert.equal(resolveTierModel("small", config), "openai/gpt-4.1-mini");
+      assert.equal(resolveTierModel("medium", config), "openai/gpt-4.1");
+      assert.equal(resolveTierModel("big", config), "openai/gpt-5");
     });
 
     it("returns undefined for unknown tier name", async () => {
       const { resolveTierModel } = await loadModule();
-      const config = { tiers: { small: ["gpt-4.1-mini"] } };
-      const result = resolveTierModel("nonexistent", config, FAKE_AVAILABLE);
-      assert.equal(result, undefined);
+      const config = { tiers: { small: "gpt-4.1-mini" } };
+      assert.equal(resolveTierModel("nonexistent", config), undefined);
     });
 
-    it("returns undefined when no models in tier are available", async () => {
+    it("returns empty string when tier exists but no model is assigned", async () => {
       const { resolveTierModel } = await loadModule();
+      const config = { tiers: { small: "gpt-4.1-mini", medium: "" } };
+      assert.equal(resolveTierModel("medium", config), "");
+    });
+  });
+
+  describe("ensureModelTierConfig", () => {
+    it("returns existing config when file exists", async () => {
+      const { ensureModelTierConfig, saveModelTierConfig } = await loadModule();
+      const tmpDir = mkdtempSync(join(tmpdir(), "mtc-ensure-"));
+      const cfgPath = join(tmpDir, "model-tiers.json");
       const config = {
-        tiers: {
-          small: ["unicorn-model", "dolphin-model"],
-        },
+        tiers: { small: "gpt-4.1-mini", medium: "gpt-4.1", big: "gpt-5" },
       };
-      const result = resolveTierModel("small", config, ["some-other-model"]);
-      assert.equal(result, undefined);
+      saveModelTierConfig(config, cfgPath);
+
+      const result = ensureModelTierConfig(cfgPath);
+      assert.deepEqual(result, config);
+      assert.equal(typeof result.tiers.small, "string");
+      assert.equal(typeof result.tiers.medium, "string");
+      assert.equal(typeof result.tiers.big, "string");
+      rmSync(tmpDir, { recursive: true, force: true });
     });
 
-    it("returns undefined for empty tier", async () => {
-      const { resolveTierModel } = await loadModule();
-      const config = { tiers: { small: [] } };
-      const result = resolveTierModel("small", config, FAKE_AVAILABLE);
-      assert.equal(result, undefined);
+    it("creates default config when file doesn't exist", async () => {
+      const { ensureModelTierConfig } = await loadModule();
+      const tmpDir = mkdtempSync(join(tmpdir(), "mtc-ensure-"));
+      const cfgPath = join(tmpDir, "fresh-model-tiers.json");
+
+      const result = ensureModelTierConfig(cfgPath);
+
+      assert.ok(result.tiers, "should have tiers");
+      assert.ok(Object.keys(result.tiers).length > 0, "should have at least one tier");
+      for (const model of Object.values(result.tiers)) {
+        assert.equal(typeof model, "string", "each tier should hold a string");
+      }
+      rmSync(tmpDir, { recursive: true, force: true });
     });
 
-    it("matches by bare modelId when available list has provider/modelId", async () => {
-      const { resolveTierModel } = await loadModule();
-      const config = {
-        tiers: {
-          small: ["gpt-4.1-mini"],
-        },
-      };
-      const result = resolveTierModel("small", config, ["openai/gpt-4.1-mini"]);
-      assert.equal(result, "gpt-4.1-mini", "should match bare id against provider/id");
+    it("saves the default config to disk", async () => {
+      const { ensureModelTierConfig } = await loadModule();
+      const tmpDir = mkdtempSync(join(tmpdir(), "mtc-ensure-"));
+      const cfgPath = join(tmpDir, "disk-model-tiers.json");
+
+      const result = ensureModelTierConfig(cfgPath);
+
+      assert.ok(existsSync(cfgPath), "config file should be written to disk");
+      // Verify the file content matches the returned config
+      const { loadModelTierConfig } = await loadModule();
+      const loaded = loadModelTierConfig(cfgPath);
+      assert.deepEqual(loaded, result, "file content should match returned config");
+      rmSync(tmpDir, { recursive: true, force: true });
     });
 
-    it("matches by provider/modelId when tier has full spec", async () => {
-      const { resolveTierModel } = await loadModule();
-      const config = {
-        tiers: {
-          small: ["openai/gpt-4.1-mini"],
-        },
-      };
-      const result = resolveTierModel("small", config, ["openai/gpt-4.1-mini"]);
-      assert.equal(result, "openai/gpt-4.1-mini");
+    it("builds and saves defaults when file is corrupt", async () => {
+      const { ensureModelTierConfig } = await loadModule();
+      const tmpDir = mkdtempSync(join(tmpdir(), "mtc-ensure-"));
+      const cfgPath = join(tmpDir, "corrupt-model-tiers.json");
+      writeFileSync(cfgPath, "{invalid json", "utf-8");
+
+      const result = ensureModelTierConfig(cfgPath);
+
+      assert.ok(result.tiers, "should recover with defaults");
+      for (const model of Object.values(result.tiers)) {
+        assert.equal(typeof model, "string", "each tier should hold a string");
+      }
+      rmSync(tmpDir, { recursive: true, force: true });
     });
 
-    it("uses listAvailableModelSpecs() when availableModels is omitted", async () => {
-      const { resolveTierModel } = await loadModule();
-      const config = { tiers: { medium: ["openai/gpt-4.1"] } };
-      // Should not throw; returns whatever the real env reports
-      const result = resolveTierModel("medium", config);
-      // May be undefined in test env with no real auth — that's fine
-      assert.doesNotThrow(() => resolveTierModel("medium", config));
+    it("builds and saves defaults when tiers has non-string values", async () => {
+      const { ensureModelTierConfig } = await loadModule();
+      const tmpDir = mkdtempSync(join(tmpdir(), "mtc-ensure-"));
+      const cfgPath = join(tmpDir, "bad-type-model-tiers.json");
+      writeFileSync(cfgPath, '{"tiers": {"small": ["gpt-4.1-mini"]}}', "utf-8");
+
+      const result = ensureModelTierConfig(cfgPath);
+
+      assert.ok(result.tiers, "should recover with defaults");
+      for (const model of Object.values(result.tiers)) {
+        assert.equal(typeof model, "string", "each tier should hold a string");
+      }
+      rmSync(tmpDir, { recursive: true, force: true });
     });
   });
 
@@ -196,12 +224,15 @@ describe("model-tier-config", () => {
       const { loadModelTierConfig, saveModelTierConfig } = await loadModule();
       const tmpDir = mkdtempSync(join(tmpdir(), "mtc-test-"));
       const cfgPath = join(tmpDir, "model-tiers.json");
-      const config = { tiers: { small: ["gpt-4.1-mini"], medium: ["gpt-4.1"] } };
+      const config = {
+        tiers: { small: "gpt-4.1-mini", medium: "gpt-4.1", big: "gpt-5" },
+      };
       saveModelTierConfig(config, cfgPath);
       const loaded = loadModelTierConfig(cfgPath);
       assert.ok(loaded);
-      assert.deepEqual(loaded!.tiers.small, ["gpt-4.1-mini"]);
-      assert.deepEqual(loaded!.tiers.medium, ["gpt-4.1"]);
+      assert.equal(loaded!.tiers.small, "gpt-4.1-mini", "single-model string");
+      assert.equal(loaded!.tiers.medium, "gpt-4.1", "single-model string");
+      assert.equal(loaded!.tiers.big, "gpt-5", "single-model string");
       rmSync(tmpDir, { recursive: true, force: true });
     });
 
@@ -235,13 +266,24 @@ describe("model-tier-config", () => {
       rmSync(tmpDir, { recursive: true, force: true });
     });
 
-    it("returns null when a tier value is not an array", async () => {
+    it("returns null when a tier value is not a string", async () => {
+      const { loadModelTierConfig } = await loadModule();
+      const tmpDir = mkdtempSync(join(tmpdir(), "mtc-test-"));
+      const cfgPath = join(tmpDir, "model-tiers.json");
+      writeFileSync(cfgPath, '{"tiers": {"small": ["gpt-4.1-mini"]}}', "utf-8");
+      const result = loadModelTierConfig(cfgPath);
+      assert.equal(result, null, "array values should be rejected — expected string");
+      rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    it("accepts config where a tier value is a valid string", async () => {
       const { loadModelTierConfig } = await loadModule();
       const tmpDir = mkdtempSync(join(tmpdir(), "mtc-test-"));
       const cfgPath = join(tmpDir, "model-tiers.json");
       writeFileSync(cfgPath, '{"tiers": {"small": "gpt-4.1-mini"}}', "utf-8");
       const result = loadModelTierConfig(cfgPath);
-      assert.equal(result, null);
+      assert.ok(result, "string values should be accepted");
+      assert.equal(result!.tiers.small, "gpt-4.1-mini");
       rmSync(tmpDir, { recursive: true, force: true });
     });
   });
@@ -250,7 +292,7 @@ describe("model-tier-config", () => {
     it("returns names sorted: small < medium < big", async () => {
       const { sortedTierNames } = await loadModule();
       const config = {
-        tiers: { big: [], small: [], medium: [] },
+        tiers: { big: "gpt-5", small: "gpt-4.1-mini", medium: "gpt-4.1" },
       };
       const sorted = sortedTierNames(config);
       assert.deepEqual(sorted, ["small", "medium", "big"]);
@@ -259,7 +301,11 @@ describe("model-tier-config", () => {
     it("handles custom tier names alphabetically after standard ones", async () => {
       const { sortedTierNames } = await loadModule();
       const config = {
-        tiers: { xlarge: [], medium: [], small: [] },
+        tiers: {
+          xlarge: "gpt-5",
+          medium: "gpt-4.1",
+          small: "gpt-4.1-mini",
+        },
       };
       const sorted = sortedTierNames(config);
       assert.deepEqual(sorted, ["small", "medium", "xlarge"]);
@@ -267,13 +313,13 @@ describe("model-tier-config", () => {
   });
 
   describe("formatTierConfig", () => {
-    it("returns a readable multi-line string", async () => {
+    it("returns a readable multi-line string with single model per line", async () => {
       const { formatTierConfig } = await loadModule();
       const config = {
         tiers: {
-          small: ["gpt-4.1-mini"],
-          medium: ["gpt-4.1"],
-          big: ["gpt-5"],
+          small: "gpt-4.1-mini",
+          medium: "gpt-4.1",
+          big: "gpt-5",
         },
       };
       const text = formatTierConfig(config);
@@ -282,6 +328,28 @@ describe("model-tier-config", () => {
       assert.ok(text.includes("gpt-4.1"));
       assert.ok(text.includes("gpt-5"));
       assert.ok(text.includes("Model tier configuration"));
+
+      // Each tier line should show exactly one model (no commas from array join)
+      const lines = text.split("\n");
+      for (const line of lines) {
+        if (line.startsWith("  ")) {
+          const parts = line.split(": ");
+          assert.equal(
+            parts.length,
+            2,
+            `line should have one value after colon: ${line}`,
+          );
+        }
+      }
+    });
+
+    it("formats a single-tier config correctly", async () => {
+      const { formatTierConfig } = await loadModule();
+      const config = { tiers: { small: "openai/gpt-4.1-mini" } };
+      const text = formatTierConfig(config);
+      assert.ok(text.includes("small"));
+      assert.ok(text.includes("openai/gpt-4.1-mini"));
+      assert.ok(!text.includes(","), "single model should not contain commas");
     });
   });
 
@@ -300,13 +368,22 @@ describe("model-tier-config", () => {
     it("classifies flash variants as small", async () => {
       const { classifyModelSpec } = await loadModule();
       assert.equal(classifyModelSpec("openai/gpt-4.1-nano"), "small");
-      assert.equal(classifyModelSpec("openrouter/google/gemini-2.0-flash-001"), "small");
-      assert.equal(classifyModelSpec("openrouter/deepseek/deepseek-v4-flash"), "small");
+      assert.equal(
+        classifyModelSpec("openrouter/google/gemini-2.0-flash-001"),
+        "small",
+      );
+      assert.equal(
+        classifyModelSpec("openrouter/deepseek/deepseek-v4-flash"),
+        "small",
+      );
     });
 
     it("classifies haiku variants as small", async () => {
       const { classifyModelSpec } = await loadModule();
-      assert.equal(classifyModelSpec("openrouter/anthropic/claude-haiku-4.5"), "small");
+      assert.equal(
+        classifyModelSpec("openrouter/anthropic/claude-haiku-4.5"),
+        "small",
+      );
     });
 
     it("classifies lite variants as small", async () => {
@@ -317,15 +394,27 @@ describe("model-tier-config", () => {
     it("classifies medium-range models as medium", async () => {
       const { classifyModelSpec } = await loadModule();
       assert.equal(classifyModelSpec("openai/gpt-4.1"), "medium");
-      assert.equal(classifyModelSpec("openrouter/anthropic/claude-sonnet-4"), "medium");
+      assert.equal(
+        classifyModelSpec("openrouter/anthropic/claude-sonnet-4"),
+        "medium",
+      );
     });
 
     it("classifies top reasoning models as big", async () => {
       const { classifyModelSpec } = await loadModule();
       assert.equal(classifyModelSpec("openai/gpt-5"), "big");
-      assert.equal(classifyModelSpec("openrouter/anthropic/claude-opus-4"), "big");
-      assert.equal(classifyModelSpec("openrouter/google/gemini-2.5-pro"), "big");
-      assert.equal(classifyModelSpec("openrouter/deepseek/deepseek-v4-pro"), "big");
+      assert.equal(
+        classifyModelSpec("openrouter/anthropic/claude-opus-4"),
+        "big",
+      );
+      assert.equal(
+        classifyModelSpec("openrouter/google/gemini-2.5-pro"),
+        "big",
+      );
+      assert.equal(
+        classifyModelSpec("openrouter/deepseek/deepseek-v4-pro"),
+        "big",
+      );
     });
 
     it("classifies o-series models as big", async () => {
@@ -350,7 +439,10 @@ describe("model-tier-config", () => {
       const result = classifyModelsToTiers(FAKE_AVAILABLE);
       const allClassified = Object.values(result).flat();
       for (const m of FAKE_AVAILABLE) {
-        assert.ok(allClassified.includes(m), `${m} should be classified into a tier`);
+        assert.ok(
+          allClassified.includes(m),
+          `${m} should be classified into a tier`,
+        );
       }
     });
 
@@ -359,7 +451,11 @@ describe("model-tier-config", () => {
       const result = classifyModelsToTiers(FAKE_AVAILABLE);
       const all: string[] = Object.values(result).flat();
       const unique = new Set(all);
-      assert.equal(all.length, unique.size, "no model should appear in multiple tiers");
+      assert.equal(
+        all.length,
+        unique.size,
+        "no model should appear in multiple tiers",
+      );
     });
 
     it("classifies models consistently with classifyModelSpec", async () => {

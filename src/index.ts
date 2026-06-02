@@ -62,6 +62,7 @@ export { registerWorkflowModelsCommand } from "./workflows-models-command.js";
 export type { ModelTierConfig } from "./model-tier-config.js";
 export {
   buildDefaultTierConfig,
+  ensureModelTierConfig,
   formatTierConfig,
   getModelTierConfigPath,
   loadModelTierConfig,

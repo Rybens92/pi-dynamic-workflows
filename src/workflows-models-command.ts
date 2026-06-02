@@ -6,13 +6,16 @@
  *
  * Model selection draws from the same `listAvailableModelSpecs()` that powers
  * Pi's `/model` command, so users see exactly the same models.
+ *
+ * Each tier holds exactly one model spec string.
+ * When editing a tier, a single-select picker is used (like Pi's `/model`).
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { listAvailableModelSpecs } from "./agent.js";
 import {
   buildDefaultTierConfig,
-  loadModelTierConfig,
+  ensureModelTierConfig,
   saveModelTierConfig,
   sortedTierNames,
 } from "./model-tier-config.js";
@@ -26,8 +29,8 @@ export function registerWorkflowModelsCommand(pi: ExtensionAPI): void {
     handler: async (_args, ctx) => {
       await ctx.waitForIdle();
 
-      // Load current config or build a default one the user can save
-      let config = loadModelTierConfig() ?? buildDefaultTierConfig();
+      // ensureModelTierConfig handles "fresh install" — creates default config if none exists
+      let config = ensureModelTierConfig();
       let dirty = false;
 
       const ensureFresh = (cfg: typeof config) => {
@@ -42,8 +45,8 @@ export function registerWorkflowModelsCommand(pi: ExtensionAPI): void {
 
         menuOptions.push("─".repeat(30));
         for (const name of tiers) {
-          const models = config.tiers[name];
-          menuOptions.push(`${name} tier (${models.length} models)`);
+          const model = config.tiers[name];
+          menuOptions.push(`${name} tier → ${model}`);
         }
         menuOptions.push("─".repeat(30));
 
@@ -54,10 +57,10 @@ export function registerWorkflowModelsCommand(pi: ExtensionAPI): void {
 
         if (!choice) break;
 
-        // Handle "<tier> → [...]" selections
+        // Handle "<tier> → [model]" selections
         for (const name of tiers) {
-          if (choice.startsWith(`${name} tier (`)) {
-            const updatedTiers = await editTier(ctx, config.tiers, name);
+          if (choice.startsWith(`${name} tier →`)) {
+            const updatedTiers = await editSingleTier(ctx, config.tiers, name);
             if (updatedTiers !== null) {
               ensureFresh({ ...config, tiers: updatedTiers });
             }
@@ -68,7 +71,7 @@ export function registerWorkflowModelsCommand(pi: ExtensionAPI): void {
         if (choice === "Reset to defaults") {
           const confirmed = await ctx.ui.confirm(
             "Reset model tiers",
-            "This will auto-classify your available models. Continue?",
+            "This will replace current configuration with auto-classified defaults. Continue?",
           );
           if (confirmed) {
             ensureFresh(buildDefaultTierConfig());
@@ -89,73 +92,69 @@ export function registerWorkflowModelsCommand(pi: ExtensionAPI): void {
 }
 
 /**
- * Interactive editor for a single tier's model list.
- * Shows ALL available models with checkmarks — no heuristic filtering.
- * Loops internally so the user can add/remove multiple models before
- * returning to the parent menu. Returns updated tiers object or null.
+ * Interactive editor for a single tier — single-select model picker.
+ *
+ * Shows ALL available models, marks the currently selected one with "→".
+ * This is the same interaction pattern as Pi's `/model` command.
+ *
+ * Includes "Clear" (remove the model from this tier) and "Done" (return).
+ *
+ * Returns the updated tiers object, or null if nothing changed.
  */
-async function editTier(
+export async function editSingleTier(
   ctx: {
     ui: {
       select: (title: string, options: string[]) => Promise<string | undefined>;
       notify: (msg: string, type?: "error" | "info" | "warning") => void;
-      confirm: (title: string, msg: string) => Promise<boolean>;
     };
   },
-  tiers: Record<string, string[]>,
+  tiers: Record<string, string>,
   tierName: string,
-): Promise<Record<string, string[]> | null> {
+): Promise<Record<string, string> | null> {
   const available = listAvailableModelSpecs();
-  let current = [...(tiers[tierName] ?? [])];
+  const current = tiers[tierName];
 
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    const currentStr = current.length > 0 ? current.join(", ") : "(empty)";
+  const currentStr = current ?? "(none)";
 
-    // Show ALL available models — unchecked (○) or checked (✓)
-    const modelOptions = available.map((m) => {
-      const selected = current.includes(m);
-      return `${selected ? "✓" : "○"} ${m}`;
-    });
+  // Build a single-select model list: currently selected gets "→" prefix
+  const modelOptions = available.map((m) => {
+    return m === current ? `→ ${m}` : `  ${m}`;
+  });
 
-    const options: string[] = [`Current: ${currentStr}`, "─".repeat(30), ...modelOptions, "─".repeat(30)];
+  const options: string[] = [
+    `Current: ${currentStr}`,
+    "─".repeat(30),
+    ...modelOptions,
+    "─".repeat(30),
+    "Clear",
+    "Done",
+  ];
 
-    if (current.length > 0) {
-      options.push("Clear all");
+  const choice = await ctx.ui.select(`Pick a model for "${tierName}" tier`, options);
+
+  if (!choice || choice === "Done") return null;
+
+  if (choice === "Clear") {
+    if (current === undefined) {
+      ctx.ui.notify(`"${tierName}" tier already has no model assigned.`, "info");
+      return null;
     }
-    options.push("Done");
-
-    const choice = await ctx.ui.select(`Toggle models for "${tierName}" — click to add/remove`, options);
-
-    if (!choice || choice === "Done") break;
-
-    if (choice === "Clear all") {
-      const confirmed = await ctx.ui.confirm("Clear tier", `Remove all models from "${tierName}" tier?`);
-      if (confirmed) {
-        current = [];
-        ctx.ui.notify(`"${tierName}" tier cleared.`, "info");
-      }
-      continue;
+    // Build a new tiers object without this key to "clear" it
+    const newTiers: Record<string, string> = {};
+    for (const [k, v] of Object.entries(tiers)) {
+      if (k !== tierName) newTiers[k] = v;
     }
-
-    // Toggle model selection — extract model name from "✓ provider/model" or "○ provider/model"
-    const modelMatch = choice.match(/^[✓○] (.+)$/);
-    if (!modelMatch) continue;
-
-    const modelSpec = modelMatch[1];
-    const idx = current.indexOf(modelSpec);
-    if (idx >= 0) {
-      current.splice(idx, 1);
-    } else {
-      current.push(modelSpec);
-    }
+    ctx.ui.notify(`"${tierName}" tier cleared (no model assigned).`, "info");
+    return newTiers;
   }
 
-  // Check if anything changed
-  const prev = tiers[tierName] ?? [];
-  if (current.length === prev.length && current.every((m, i) => m === prev[i])) {
-    return null; // no changes
-  }
+  // Extract model name from "→ provider/model" or "  provider/model"
+  const modelMatch = choice.match(/^(?:→ | {2})(.+)$/);
+  if (!modelMatch) return null;
 
-  return { ...tiers, [tierName]: current };
+  const modelSpec = modelMatch[1];
+  if (modelSpec === current) return null; // no change
+
+  ctx.ui.notify(`"${tierName}" tier → ${modelSpec}`, "info");
+  return { ...tiers, [tierName]: modelSpec };
 }

@@ -4,15 +4,15 @@
  * Defines tier-based model selection (small/medium/big) that augments
  * the existing model-routing.ts mechanism with enforceable model assignment.
  *
- * A tier is a named group of model spec strings (e.g. "gpt-4.1-mini").
- * When an agent() call specifies opts.tier, the first available model
- * from that tier's list is resolved and set as opts.model before the
+ * A tier is a named slot holding exactly ONE model spec string
+ * (e.g. "gpt-4.1-mini"). When an agent() call specifies opts.tier,
+ * that single model is resolved and set as opts.model before the
  * subagent session starts.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
 import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 import { listAvailableModelSpecs } from "./agent.js";
 
 // ---------------------------------------------------------------------------
@@ -30,11 +30,11 @@ export function getModelTierConfigPath(): string {
 
 /**
  * Model tier configuration.
- * Maps tier names (e.g. "small", "medium", "big") to ordered lists of
- * model spec strings (e.g. "gpt-4.1-mini" or "openai/gpt-4.1-mini").
+ * Maps tier names (e.g. "small", "medium", "big") to a single model
+ * spec string (e.g. "gpt-4.1-mini" or "openai/gpt-4.1-mini").
  */
 export interface ModelTierConfig {
-  tiers: Record<string, string[]>;
+  tiers: Record<string, string>;
 }
 
 // ---------------------------------------------------------------------------
@@ -73,7 +73,7 @@ function isSmallModel(lower: string): boolean {
 export function classifyModelSpec(modelSpec: string): string {
   // Extract the last segment after the final "/" as the model ID.
   // Handles both "provider/id" and "provider/provider/id" patterns.
-  const id = modelSpec.includes("/") ? modelSpec.split("/").pop()! : modelSpec;
+  const id = modelSpec.includes("/") ? (modelSpec.split("/").pop() ?? modelSpec) : modelSpec;
   const lower = id.toLowerCase();
 
   if (isBigModel(lower)) return "big";
@@ -91,9 +91,7 @@ export function classifyModelSpec(modelSpec: string): string {
  * @param availableModels - Array of model spec strings.
  * @returns A map of tier name to array of model specs in that tier.
  */
-export function classifyModelsToTiers(
-  availableModels: string[],
-): Record<string, string[]> {
+export function classifyModelsToTiers(availableModels: string[]): Record<string, string[]> {
   const small: string[] = [];
   const medium: string[] = [];
   const big: string[] = [];
@@ -123,21 +121,30 @@ export function classifyModelsToTiers(
  * - "small":   mini/flash/lite/haiku/nano variants of the SAME provider
  * - "medium":  mid-range (gpt-4.1, claude-sonnet, gemini-pro)
  * - "big":     top-tier (gpt-5/claude-opus/gemini-pro-2.5 thinking)
+ *
+ * For each tier, the first classified model is selected. If a tier ends
+ * up empty, the first model available overall is used as fallback.
  */
 export function buildDefaultTierConfig(): ModelTierConfig {
   const available = listAvailableModelSpecs();
-  const tiers = classifyModelsToTiers(available);
+  const classified = classifyModelsToTiers(available);
+  const firstOverall = available[0];
 
-  // Fallback: if classification produced empty tiers, put everything in medium
-  if (Object.keys(tiers).length === 0) {
-    return { tiers: { small: [...available], medium: [...available], big: [...available] } };
-  }
+  const small = classified.small?.[0] ?? firstOverall;
+  const medium = classified.medium?.[0] ?? firstOverall;
+  const big = classified.big?.[0] ?? firstOverall;
 
-  return { tiers };
+  return {
+    tiers: {
+      small,
+      medium,
+      big,
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
-// Load / Save
+// Load / Save / Ensure
 // ---------------------------------------------------------------------------
 
 /**
@@ -152,9 +159,8 @@ export function loadModelTierConfig(configPath?: string): ModelTierConfig | null
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object") return null;
     if (!parsed.tiers || typeof parsed.tiers !== "object") return null;
-    for (const [key, val] of Object.entries(parsed.tiers)) {
-      if (!Array.isArray(val)) return null;
-      if (!val.every((v) => typeof v === "string")) return null;
+    for (const [_key, val] of Object.entries(parsed.tiers)) {
+      if (typeof val !== "string") return null;
     }
     return parsed as ModelTierConfig;
   } catch {
@@ -175,27 +181,35 @@ export function saveModelTierConfig(config: ModelTierConfig, configPath?: string
 }
 
 /**
+ * Ensure a model tier config exists and is valid.
+ *
+ * Loads the config from disk. If no valid config is found (fresh install
+ * or corrupt file), builds a default config, persists it, and returns it.
+ *
+ * @param configPath - Optional override path for the config file.
+ * @returns A valid {@link ModelTierConfig}.
+ */
+export function ensureModelTierConfig(configPath?: string): ModelTierConfig {
+  const existing = loadModelTierConfig(configPath);
+  if (existing) return existing;
+
+  const defaults = buildDefaultTierConfig();
+  saveModelTierConfig(defaults, configPath);
+  return defaults;
+}
+
+/**
  * Resolve a tier name to a concrete model spec.
  *
- * Scans the tier's model list in order and returns the first model that
- * is available (present in the user's configured models). If none of the
- * tier's models are available, returns undefined.
+ * Returns the single model string configured for the given tier,
+ * or undefined if the tier does not exist.
  *
- * When availableModels is omitted, calls listAvailableModelSpecs().
+ * @param tier - The tier name (e.g. "small", "medium", "big").
+ * @param config - The model tier configuration.
+ * @returns The model spec string, or undefined if the tier is not configured.
  */
-export function resolveTierModel(
-  tier: string,
-  config: ModelTierConfig,
-  availableModels?: string[],
-): string | undefined {
-  const models = config.tiers[tier];
-  if (!models || models.length === 0) return undefined;
-
-  const available = availableModels ?? listAvailableModelSpecs();
-  return models.find((m) => {
-    // Match by full spec (provider/modelId) or just modelId
-    return available.some((a) => a === m || a.endsWith(`/${m}`) || a === m.split("/").pop());
-  });
+export function resolveTierModel(tier: string, config: ModelTierConfig): string | undefined {
+  return config.tiers[tier];
 }
 
 // ---------------------------------------------------------------------------
@@ -218,8 +232,8 @@ export function formatTierConfig(config: ModelTierConfig): string {
   const tiers = sortedTierNames(config);
   const lines = ["Model tier configuration:"];
   for (const name of tiers) {
-    const models = config.tiers[name];
-    lines.push(`  ${name}: ${models.join(", ")}`);
+    const model = config.tiers[name];
+    lines.push(`  ${name}: ${model}`);
   }
   return lines.join("\n");
 }
