@@ -46,3 +46,22 @@ test("WorkflowAgent constructor handles all option combinations gracefully", () 
   });
   assert.ok(agent instanceof WorkflowAgent);
 });
+
+test("WorkflowAgent constructor accepts mainModel option", () => {
+  const agent = new WorkflowAgent({
+    cwd: "/tmp",
+    mainModel: "openai/gpt-4.1",
+  });
+  assert.ok(agent instanceof WorkflowAgent);
+});
+
+test("WorkflowAgent constructor handles all options including mainModel", () => {
+  const agent = new WorkflowAgent({
+    cwd: "/tmp",
+    tools: [],
+    session: {},
+    instructions: "test",
+    mainModel: "openai/gpt-4.1",
+  });
+  assert.ok(agent instanceof WorkflowAgent);
+});

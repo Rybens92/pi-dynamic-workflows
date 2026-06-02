@@ -23,6 +23,13 @@ export interface WorkflowAgentOptions {
   session?: Partial<CreateAgentSessionOptions>;
   /** Extra system guidance prepended to every subagent task. */
   instructions?: string;
+  /**
+   * The session's main model (`provider/modelId`). Used as a fallback when
+   * resolving opts.tier and no model-tiers.json config exists. Without this,
+   * a workflow using `{ tier: "small" }` would log a warning and fall through
+   * to the session default when no config is saved yet.
+   */
+  mainModel?: string;
 }
 
 /**
@@ -93,6 +100,7 @@ export class WorkflowAgent {
   private readonly baseTools: ToolDefinition[];
   private readonly sessionOptions: Partial<CreateAgentSessionOptions>;
   private readonly instructions?: string;
+  private readonly mainModel?: string;
   /** Lazily built once; shares the SDK's agentDir/auth so resolved models are authed. */
   private registry?: ModelRegistry;
 
@@ -101,6 +109,7 @@ export class WorkflowAgent {
     this.baseTools = options.tools ?? createCodingTools(this.cwd);
     this.sessionOptions = options.session ?? {};
     this.instructions = options.instructions;
+    this.mainModel = options.mainModel;
   }
 
   private getRegistry(): ModelRegistry {
@@ -151,11 +160,11 @@ export class WorkflowAgent {
       const tierConfig = loadModelTierConfig();
       if (tierConfig) {
         resolvedModelSpec = resolveTierModel(options.tier, tierConfig);
-        if (!resolvedModelSpec) {
-          console.warn(`[workflow] tier "${options.tier}" has no available model; falling back`);
-        }
-      } else {
-        console.warn(`[workflow] no model-tiers config found; ignoring tier "${options.tier}"`);
+      }
+      // No config yet or tier not found => fall back to the main session model.
+      // This lets workflows use `{ tier: "small" }` without any setup.
+      if (!resolvedModelSpec && this.mainModel) {
+        resolvedModelSpec = this.mainModel;
       }
     }
 
