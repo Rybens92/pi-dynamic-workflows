@@ -2,7 +2,7 @@
  * Workflow run state persistence for pause/resume support.
  */
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { WORKFLOW_RUNS_DIR } from "./config.js";
 
@@ -110,7 +110,6 @@ export function createRunPersistence(cwd: string): RunPersistence {
       try {
         const path = runPath(runId);
         if (existsSync(path)) {
-          const { unlinkSync } = require("node:fs");
           unlinkSync(path);
           return true;
         }
