@@ -18,7 +18,7 @@ export interface TaskPanelOptions {
   cwd?: string;
 }
 
-function deliverText(run: ManagedRun): string {
+export function deliverText(run: ManagedRun): string {
   const result = run.result?.result as Record<string, unknown> | undefined;
   // Try to find a clean text summary in order of preference:
   // 1. verdict (most common for orchestrate/deep-research workflows)

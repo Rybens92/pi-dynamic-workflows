@@ -195,11 +195,15 @@ export function createWorkflowTool(options: WorkflowToolOptions = {}): ToolDefin
           }`
         : "";
 
+      const formattedResult = result.result !== undefined
+        ? `\n\`\`\`json\n${JSON.stringify(result.result, null, 2)}\n\`\`\``
+        : "";
+
       return {
         content: [
           {
             type: "text",
-            text: `Workflow ${result.meta.name} completed with ${result.agentCount} agent(s).\n\nResult:\n${JSON.stringify(result.result, null, 2)}${tokenInfo}`,
+            text: `Workflow **${result.meta.name}** completed with **${result.agentCount}** agent(s).${tokenInfo}\n\n## Result${formattedResult}`,
           },
         ],
         details: {
