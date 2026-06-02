@@ -138,7 +138,6 @@ export function createToolUpdateWorkflowDisplay(
 
 export function renderWorkflowLines(snapshot: WorkflowSnapshot, options: WorkflowDisplayOptions = {}): string[] {
   const maxAgents = options.maxAgents ?? 8;
-  const maxLogs = options.maxLogs ?? 2;
   const showResultPreviews = options.showResultPreviews ?? false;
   const state =
     snapshot.errorCount > 0
@@ -192,8 +191,6 @@ export function renderWorkflowLines(snapshot: WorkflowSnapshot, options: Workflo
       lines.push(`    [${agent.id}] ${statusIcon(agent.status)} ${shorten(agent.label, 48)}${agentTokens}${result}`);
     }
   }
-
-  for (const log of snapshot.logs.slice(-maxLogs)) lines.push(`  log: ${log}`);
 
   return lines;
 }

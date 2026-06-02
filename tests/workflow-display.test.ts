@@ -157,24 +157,7 @@ describe("renderWorkflowText", () => {
     assert.ok(text.includes("1 skipped"), "should show skipped count");
   });
 
-  it("shows logs in output", async () => {
-    const { createWorkflowSnapshot, renderWorkflowLines } = await loadDisplay();
-    const snap = createWorkflowSnapshot(fakeMeta());
-    snap.logs = ["starting research", "found 3 files"];
-    const text = renderWorkflowLines(snap).join("\n");
-    assert.ok(text.includes("starting research"));
-    assert.ok(text.includes("found 3 files"));
-  });
 
-  it("limits logs to maxLogs", async () => {
-    const { createWorkflowSnapshot, renderWorkflowLines } = await loadDisplay();
-    const snap = createWorkflowSnapshot(fakeMeta());
-    snap.logs = ["log1", "log2", "log3", "log4", "log5"];
-    const text = renderWorkflowLines(snap, { maxLogs: 2 }).join("\n");
-    assert.ok(!text.includes("log1"), "early logs should be clipped");
-    assert.ok(text.includes("log4"), "recent logs should appear");
-    assert.ok(text.includes("log5"));
-  });
 
   it("shows unphased agents when agents have no phase", async () => {
     const { createWorkflowSnapshot, renderWorkflowLines } = await loadDisplay();
