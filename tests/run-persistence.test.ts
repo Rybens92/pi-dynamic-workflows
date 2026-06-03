@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -306,3 +306,137 @@ test("generateRunId produces unique ids", () => {
   const ids = new Set(Array.from({ length: 100 }, () => generateRunId()));
   assert.equal(ids.size, 100, "all 100 generated ids should be unique");
 });
+
+test(
+  "createRunPersistence save throws ENOSPC when disk is full",
+  withTempCwd(async (cwd) => {
+    const rp = createRunPersistence(cwd, {
+      writeFileSync: () => {
+        const err = new Error("ENOSPC: no space left on device");
+        (err as { code?: string }).code = "ENOSPC";
+        throw err;
+      },
+    });
+
+    const state: PersistedRunState = {
+      runId: "enospc-test",
+      workflowName: "wf",
+      script: "export const meta = { name: 'w', description: 'w' }",
+      status: "pending",
+      phases: [],
+      agents: [],
+      logs: [],
+      startedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    assert.throws(
+      () => rp.save(state),
+      (err: unknown) => (err as { code?: string }).code === "ENOSPC",
+    );
+  }),
+);
+
+test(
+  "createRunPersistence save throws EACCES when permission denied",
+  withTempCwd(async (cwd) => {
+    const rp = createRunPersistence(cwd, {
+      writeFileSync: () => {
+        const err = new Error("EACCES: permission denied");
+        (err as { code?: string }).code = "EACCES";
+        throw err;
+      },
+    });
+
+    const state: PersistedRunState = {
+      runId: "eacces-test",
+      workflowName: "wf",
+      script: "export const meta = { name: 'w', description: 'w' }",
+      status: "pending",
+      phases: [],
+      agents: [],
+      logs: [],
+      startedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    assert.throws(
+      () => rp.save(state),
+      (err: unknown) => (err as { code?: string }).code === "EACCES",
+    );
+  }),
+);
+
+test(
+  "createRunPersistence list returns empty array when directory is unreadable",
+  withTempCwd(async (cwd) => {
+    const rp = createRunPersistence(cwd);
+    const runsDir = join(cwd, WORKFLOW_RUNS_DIR);
+
+    // Save a run first so directory exists with content
+    rp.save({
+      runId: "invisible",
+      workflowName: "wf",
+      script: "export const meta = { name: 'w', description: 'w' }",
+      status: "completed",
+      phases: [],
+      agents: [],
+      logs: [],
+      startedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    // Remove read permission from the runs directory
+    chmodSync(runsDir, 0o000);
+
+    try {
+      const runs = rp.list();
+      assert.deepEqual(runs, []);
+    } finally {
+      // Restore permissions so cleanup can remove the temp directory
+      chmodSync(runsDir, 0o755);
+    }
+  }),
+);
+
+test(
+  "createRunPersistence concurrent save and load returns consistent data",
+  withTempCwd(async (cwd) => {
+    const rp = createRunPersistence(cwd);
+
+    const state: PersistedRunState = {
+      runId: "concurrent-test",
+      workflowName: "test-wf",
+      script: "export const meta = { name: 't', description: 't' }",
+      args: { items: [1, 2, 3] },
+      status: "running",
+      phases: ["Scan", "Analyze", "Report"],
+      currentPhase: "Analyze",
+      agents: [
+        { id: 1, label: "agent-a", prompt: "scan", status: "done", result: { found: true } },
+        { id: 2, label: "agent-b", prompt: "analyze", status: "running" },
+      ],
+      logs: ["started", "phase: Scan", "phase: Analyze"],
+      tokenUsage: { input: 500, output: 200, total: 700 },
+      journal: [{ index: 0, hash: "abc", result: { ok: true } }],
+      startedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      completedAt: undefined,
+    };
+
+    rp.save(state);
+    const loaded = rp.load("concurrent-test");
+
+    assert.ok(loaded, "should load immediately after save");
+    assert.equal(loaded.runId, state.runId);
+    assert.equal(loaded.workflowName, state.workflowName);
+    assert.equal(loaded.status, "running");
+    assert.equal(loaded.currentPhase, "Analyze");
+    assert.deepEqual(loaded.args, { items: [1, 2, 3] });
+    assert.deepEqual(loaded.phases, ["Scan", "Analyze", "Report"]);
+    assert.equal(loaded.agents.length, 2);
+    assert.deepEqual(loaded.agents[0].result, { found: true });
+    assert.equal(loaded.agents[1].status, "running");
+    assert.deepEqual(loaded.logs, ["started", "phase: Scan", "phase: Analyze"]);
+    assert.deepEqual(loaded.tokenUsage, { input: 500, output: 200, total: 700 });
+    assert.deepEqual(loaded.journal, [{ index: 0, hash: "abc", result: { ok: true } }]);
+  }),
+);
