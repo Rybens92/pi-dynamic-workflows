@@ -18,8 +18,11 @@ import { createWorkflowStorage, type WorkflowStorage } from "./workflow-saved.js
  * Model routing guideline for workflow authors.
  * Tells the LLM about opts.tier (small/medium/big) for runtime-enforced
  * model selection, and opts.model for an exact provider/id override.
+ *
+ * This string is injected into the workflow tool's promptGuidelines and
+ * therefore appears in the LLM's system prompt for every workflow execution.
  */
-function modelRoutingGuideline(): string {
+export function modelRoutingGuideline(): string {
   const available = listAvailableModelSpecs();
   const list = available.length
     ? `The user's currently available models (route only to these) are: ${available.join(", ")}.`

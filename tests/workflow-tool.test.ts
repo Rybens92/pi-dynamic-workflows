@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { backgroundStartedText } from "../src/workflow-tool.js";
-import { createWorkflowTool } from "../src/workflow-tool.js";
+import { backgroundStartedText, createWorkflowTool, modelRoutingGuideline } from "../src/workflow-tool.js";
 import { parseWorkflowScript } from "../src/workflow.js";
 
 // ─── backgroundStartedText ─────────────────────────────────────────────────────
@@ -61,7 +60,55 @@ test("createWorkflowTool has promptGuidelines array", () => {
 test("createWorkflowTool promptGuidelines mention model routing", () => {
   const tool = createWorkflowTool();
   const all = tool.promptGuidelines.join(" ");
-  assert.ok(all.includes("model") || all.includes("model"));
+  assert.ok(all.includes("opts.tier"), "should mention opts.tier");
+  assert.ok(all.includes("opts.model"), "should mention opts.model");
+  assert.ok(all.includes("small") || all.includes("medium") || all.includes("big"), "should mention tier names");
+});
+
+// ─── modelRoutingGuideline ──────────────────────────────────────────────────────
+
+test("modelRoutingGuideline mentions all three tier names", () => {
+  const text = modelRoutingGuideline();
+  assert.ok(text.includes("small"), "should mention small tier");
+  assert.ok(text.includes("medium"), "should mention medium tier");
+  assert.ok(text.includes("big"), "should mention big tier");
+});
+
+test("modelRoutingGuideline describes each tier purpose", () => {
+  const text = modelRoutingGuideline();
+  assert.ok(text.includes("lightweight"));
+  assert.ok(text.includes("balanced"));
+  assert.ok(text.includes("synthesis"));
+});
+
+test("modelRoutingGuideline explains tier vs model priority", () => {
+  const text = modelRoutingGuideline();
+  assert.ok(text.includes("opts.tier"), "should mention opts.tier");
+  assert.ok(text.includes("opts.model"), "should mention opts.model");
+  assert.ok(
+    /opts\.(tier|model).+opts\.(model|tier)/.test(text),
+    "should explain ordering / relationship between tier and model",
+  );
+});
+
+test("modelRoutingGuideline includes available models list", () => {
+  const text = modelRoutingGuideline();
+  assert.ok(text.includes("available models"), "should mention available models");
+  // Should reference the list of models, even if empty
+  assert.ok(text.includes("route only to these") || text.includes("available models"),
+    "should explain which models are in scope");
+});
+
+test("modelRoutingGuideline explains when to use each option", () => {
+  const text = modelRoutingGuideline();
+  assert.ok(
+    /small.*(exploration|search|inventory|agents)/i.test(text),
+    "small tier should mention light workloads",
+  );
+  assert.ok(
+    /big.*(synthesis|judgment|decision)/i.test(text),
+    "big tier should mention heavy reasoning",
+  );
 });
 
 test("createWorkflowTool invalid args throws descriptive error", () => {
@@ -82,6 +129,14 @@ test("createWorkflowTool invalid args throws descriptive error", () => {
 test("createWorkflowTool with custom cwd creates tool", () => {
   const tool = createWorkflowTool({ cwd: "/tmp" });
   assert.equal(tool.name, "workflow");
+});
+
+test("modelRoutingGuideline output is non-empty and well-formed", () => {
+  const text = modelRoutingGuideline();
+  assert.ok(text.length > 50, "should be a substantial instruction");
+  assert.ok(text.endsWith(".") || text.endsWith("") || text.endsWith("`"), "should end properly");
+  assert.ok(!text.includes("undefined"), "no undefined interpolation");
+  assert.ok(!text.includes("[object Object]"), "no object serialization leaks");
 });
 
 // ─── prepareArguments / normalizeWorkflowScript ─────────────────────────────────
