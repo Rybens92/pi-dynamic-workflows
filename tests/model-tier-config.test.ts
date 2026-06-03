@@ -225,7 +225,7 @@ describe("model-tier-config", () => {
       };
       saveModelTierConfig(config, cfgPath);
       const loaded = loadModelTierConfig(cfgPath);
-      assert.ok(loaded);
+      assert.ok(loaded, "should load successfully");
       assert.equal(loaded?.tiers.small, "gpt-4.1-mini", "single-model string");
       assert.equal(loaded?.tiers.medium, "gpt-4.1", "single-model string");
       assert.equal(loaded?.tiers.big, "gpt-5", "single-model string");
@@ -319,11 +319,11 @@ describe("model-tier-config", () => {
         },
       };
       const text = formatTierConfig(config);
-      assert.ok(text.includes("small"));
-      assert.ok(text.includes("gpt-4.1-mini"));
-      assert.ok(text.includes("gpt-4.1"));
-      assert.ok(text.includes("gpt-5"));
-      assert.ok(text.includes("Model tier configuration"));
+      assert.ok(text.includes("small"), "should contain small");
+      assert.ok(text.includes("gpt-4.1-mini"), "should contain gpt-4.1-mini");
+      assert.ok(text.includes("gpt-4.1"), "should contain gpt-4.1");
+      assert.ok(text.includes("gpt-5"), "should contain gpt-5");
+      assert.ok(text.includes("Model tier configuration"), "should contain Model tier configuration");
 
       // Each tier line should show exactly one model (no commas from array join)
       const lines = text.split("\n");
@@ -339,8 +339,8 @@ describe("model-tier-config", () => {
       const { formatTierConfig } = await loadModule();
       const config = { tiers: { small: "openai/gpt-4.1-mini" } };
       const text = formatTierConfig(config);
-      assert.ok(text.includes("small"));
-      assert.ok(text.includes("openai/gpt-4.1-mini"));
+      assert.ok(text.includes("small"), "should contain small");
+      assert.ok(text.includes("openai/gpt-4.1-mini"), "should contain openai/gpt-4.1-mini");
       assert.ok(!text.includes(","), "single model should not contain commas");
     });
   });

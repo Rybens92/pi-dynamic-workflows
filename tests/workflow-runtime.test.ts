@@ -50,7 +50,7 @@ test("runWorkflow accumulates real per-agent usage", async () => {
   assert.equal(result.tokenUsage?.input, 200);
   assert.equal(result.tokenUsage?.output, 80);
   assert.equal(result.tokenUsage?.total, 280);
-  assert.ok(Math.abs((result.tokenUsage?.cost ?? 0) - 0.004) < 1e-9);
+  assert.ok(Math.abs((result.tokenUsage?.cost ?? 0) - 0.004) < 1e-9, "should be within tolerance");
 });
 
 test("runWorkflow falls back to an estimate when provider reports total === 0", async () => {
@@ -226,8 +226,8 @@ return a`;
 
   assert.equal(result.meta.name, "meta_test");
   assert.equal(result.meta.description, "check metadata");
-  assert.ok(Array.isArray(result.logs));
-  assert.ok(Array.isArray(result.phases));
+  assert.ok(Array.isArray(result.logs), "result.logs should be an array");
+  assert.ok(Array.isArray(result.phases), "result.phases should be an array");
   assert.ok(result.durationMs > 0, "durationMs should be positive");
   assert.ok(typeof result.runId === "string" && result.runId.length > 0, "runId should be a non-empty string");
 });
@@ -258,7 +258,7 @@ return results`;
   };
 
   const result = await runWorkflow<unknown[]>(script, { agent, persistLogs: false });
-  assert.ok(Array.isArray(result.result));
+  assert.ok(Array.isArray(result.result), "result.result should be an array");
   assert.equal(result.result.length, 3);
 });
 
@@ -276,7 +276,7 @@ return results`;
   };
 
   const result = await runWorkflow<string[]>(script, { agent, persistLogs: false });
-  assert.ok(Array.isArray(result.result));
+  assert.ok(Array.isArray(result.result), "result.result should be an array");
   assert.equal(result.result.length, 2);
 });
 
@@ -315,8 +315,8 @@ return { a, b }`;
     },
   });
 
-  assert.ok(phases.includes("Phase1"));
-  assert.ok(phases.includes("Phase2"));
+  assert.ok(phases.includes("Phase1"), "should contain Phase1");
+  assert.ok(phases.includes("Phase2"), "should contain Phase2");
 });
 
 test("runWorkflow can send args to the script", async () => {
@@ -343,7 +343,7 @@ return true`;
     persistLogs: false,
   });
 
-  assert.ok(result.logs.some((l) => l.includes("hello from script")));
+  assert.ok(result.logs.some((l) => l.includes("hello from script")), "should contain hello from script");
 });
 
 test("runWorkflow console.log works inside script", async () => {
@@ -357,8 +357,8 @@ return true`;
     persistLogs: false,
   });
 
-  assert.ok(result.logs.some((l) => l.includes("console log")));
-  assert.ok(result.logs.some((l) => l.includes("console warn")));
+  assert.ok(result.logs.some((l) => l.includes("console log")), "should contain console log");
+  assert.ok(result.logs.some((l) => l.includes("console warn")), "should contain console warn");
 });
 
 test("runWorkflow process.cwd() works inside script", async () => {
@@ -371,7 +371,7 @@ return { cwd: process.cwd() }`;
   });
 
   assert.equal(typeof result.result.cwd, "string");
-  assert.ok(result.result.cwd.length > 0);
+  assert.ok(result.result.cwd.length > 0, "result.cwd should not be empty");
 });
 
 test("runWorkflow budget object exposes spent() and remaining()", async () => {
@@ -398,5 +398,5 @@ return 1`;
     persistLogs: false,
   });
 
-  assert.ok(Array.isArray(result.logs));
+  assert.ok(Array.isArray(result.logs), "result.logs should be an array");
 });

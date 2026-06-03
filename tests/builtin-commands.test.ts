@@ -113,6 +113,6 @@ test("registerBuiltinWorkflows creates handlers with expected structure", () => 
 
   const advReviewCmd = commands.find((c) => c.name === "adversarial-review");
   assert.ok(advReviewCmd, "adversarial-review should be registered");
-  assert.ok(advReviewCmd.description.includes("Investigate") || advReviewCmd.description.includes("Review"));
+  assert.ok(advReviewCmd.description.includes("Investigate") || advReviewCmd.description.includes("Review"), "should contain Investigate");
   assert.equal(typeof advReviewCmd.handler, "function");
 });

@@ -29,8 +29,8 @@ test("createStructuredOutputTool tool has execute, renderCall, renderResult", ()
     capture,
   });
   assert.equal(typeof tool.execute, "function");
-  assert.ok(tool.description);
-  assert.ok(tool.label);
+  assert.ok(tool.description, "description should be truthy");
+  assert.ok(tool.label, "label should be truthy");
 });
 
 test("createStructuredOutputTool execute captures value and marks called", async () => {
@@ -83,11 +83,11 @@ test("createStructuredOutputTool has promptSnippet and promptGuidelines", () => 
     schema: Type.Object({ result: Type.String() }),
     capture,
   });
-  assert.ok(tool.promptSnippet);
-  assert.ok(Array.isArray(tool.promptGuidelines));
-  assert.ok(tool.promptGuidelines.length > 0);
+  assert.ok(tool.promptSnippet, "promptSnippet should be truthy");
+  assert.ok(Array.isArray(tool.promptGuidelines), "tool.promptGuidelines should be an array");
+  assert.ok(tool.promptGuidelines.length > 0, "tool.promptGuidelines should not be empty");
   // Should mention the tool name in guidelines
-  assert.ok(tool.promptGuidelines.some((g: string) => g.includes("structured_output")));
+  assert.ok(tool.promptGuidelines.some((g: string) => g.includes("structured_output")), "should contain structured_output");
 });
 
 test("createStructuredOutputTool uses parameters from schema", () => {
@@ -98,5 +98,5 @@ test("createStructuredOutputTool uses parameters from schema", () => {
   });
   const tool = createStructuredOutputTool({ schema, capture });
   // TypeBox-defined parameters are available
-  assert.ok(tool.parameters);
+  assert.ok(tool.parameters, "parameters should be truthy");
 });

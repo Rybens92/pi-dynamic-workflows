@@ -21,7 +21,7 @@ describe("errors", () => {
     const err = new WorkflowError("test error", WorkflowErrorCode.AGENT_EXECUTION_ERROR);
     assert.equal(err.message, "test error");
     assert.equal(err.code, WorkflowErrorCode.AGENT_EXECUTION_ERROR);
-    assert.ok(err instanceof Error);
+    assert.ok(err instanceof Error, "err should be instance of Error");
   });
 
   it("WorkflowError can have an agent label", async () => {
@@ -115,7 +115,7 @@ describe("errors", () => {
   it("wrapError handles string errors", async () => {
     const { wrapError, WorkflowErrorCode } = await loadErrors();
     const result = wrapError("something went wrong");
-    assert.ok(result.message.includes("something went wrong"));
+    assert.ok(result.message.includes("something went wrong"), "should contain something went wrong");
     assert.equal(result.code, WorkflowErrorCode.AGENT_EXECUTION_ERROR);
   });
 
@@ -163,9 +163,9 @@ describe("logger", () => {
     log.error("test error");
     const logs = log.getLogs();
     assert.equal(logs.length, 3);
-    assert.ok(logs[0].includes("test info"));
-    assert.ok(logs[1].includes("test warn"));
-    assert.ok(logs[2].includes("test error"));
+    assert.ok(logs[0].includes("test info"), "should contain test info");
+    assert.ok(logs[1].includes("test warn"), "should contain test warn");
+    assert.ok(logs[2].includes("test error"), "should contain test error");
   });
 
   it("getLogs returns a copy (not the internal array)", async () => {
@@ -202,7 +202,7 @@ describe("display", () => {
     const { preview } = await load();
     const long = "x".repeat(200);
     const result = preview(long, 10);
-    assert.ok(result.length <= 13); // 10 + "…" (3 bytes)
+    assert.ok(result.length <= 13, "result should be at most 13");  // 10 + "…" (3 bytes)
   });
 
   it("preview returns full short values", async () => {
@@ -214,7 +214,7 @@ describe("display", () => {
   it("preview handles objects", async () => {
     const { preview } = await load();
     const result = preview({ a: 1, b: 2 }, 50);
-    assert.ok(result.length > 0);
+    assert.ok(result.length > 0, "result should not be empty");
   });
 
   it("preview handles null/undefined", async () => {
@@ -282,8 +282,8 @@ describe("display", () => {
     const meta = { name: "test-wf", description: "d", phases: [{ title: "research" }] };
     const snap = createWorkflowSnapshot(meta as never);
     const text = renderWorkflowText(snap);
-    assert.ok(text.includes("test-wf"));
-    assert.ok(text.length > 0);
+    assert.ok(text.includes("test-wf"), "should contain test-wf");
+    assert.ok(text.length > 0, "text should not be empty");
   });
 
   it("renderWorkflowText completed flag changes header", async () => {
@@ -292,8 +292,8 @@ describe("display", () => {
     const snap = createWorkflowSnapshot(meta as never);
     const running = renderWorkflowText(snap, false);
     const completed = renderWorkflowText(snap, true);
-    assert.ok(running.includes("running"));
-    assert.ok(completed.includes("completed"));
+    assert.ok(running.includes("running"), "should contain running");
+    assert.ok(completed.includes("completed"), "should contain completed");
   });
 
   it("renderWorkflowLines shows phases", async () => {
@@ -303,8 +303,8 @@ describe("display", () => {
     snap.agents = [{ id: 1, label: "agent-1", prompt: "x", status: "done", phase: "Research" }] as any;
     const lines = renderWorkflowLines(snap);
     const text = lines.join("\n");
-    assert.ok(text.includes("Research"));
-    assert.ok(text.includes("agent-1"));
+    assert.ok(text.includes("Research"), "should contain Research");
+    assert.ok(text.includes("agent-1"), "should contain agent-1");
   });
 
   it("renderWorkflowLines shows errors count", async () => {
@@ -318,7 +318,7 @@ describe("display", () => {
     snap.errorCount = 1;
     const lines = renderWorkflowLines(snap);
     const text = lines.join("\n");
-    assert.ok(text.includes("errors"));
+    assert.ok(text.includes("errors"), "should contain errors");
   });
 
   it("renderWorkflowLines shows result previews when enabled", async () => {
@@ -328,7 +328,7 @@ describe("display", () => {
     snap.agents = [{ id: 1, label: "a1", prompt: "x", status: "done", resultPreview: "found 3 issues" }] as any;
     const lines = renderWorkflowLines(snap, { showResultPreviews: true });
     const text = lines.join("\n");
-    assert.ok(text.includes("found 3 issues"));
+    assert.ok(text.includes("found 3 issues"), "should contain found 3 issues");
   });
 
   it("renderWorkflowLines shows token info when available", async () => {
@@ -338,8 +338,8 @@ describe("display", () => {
     snap.tokenUsage = { input: 100, output: 50, total: 150, cost: 0.002 };
     const lines = renderWorkflowLines(snap);
     const text = lines.join("\n");
-    assert.ok(text.includes("150"));
-    assert.ok(text.includes("$0.0020"));
+    assert.ok(text.includes("150"), "should contain 150");
+    assert.ok(text.includes("$0.0020"), "should contain $0.0020");
   });
 });
 

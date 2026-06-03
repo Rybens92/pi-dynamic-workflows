@@ -148,11 +148,11 @@ describe("colorizeWorkflow", () => {
     const { colorizeWorkflow } = await load();
     const result = colorizeWorkflow("run a workflow", 0);
     // Should contain ANSI escapes around "workflow"
-    assert.ok(result.includes("\x1b[38;5;"));
+    assert.ok(result.includes("\x1b[38;5;"), "should contain \x1b[38;5;");
     // Per-character ANSI wrapping (each letter individually colored)
-    assert.ok(result.startsWith("run a "));
-    assert.ok(result.includes("\x1b[38;5;"));
-    assert.ok(result.includes("m"));
+    assert.ok(result.startsWith("run a "), "should start with run a ");
+    assert.ok(result.includes("\x1b[38;5;"), "should contain \x1b[38;5;");
+    assert.ok(result.includes("m"), "should contain m");
   });
 
   it("returns plain text for empty string", async () => {
@@ -164,7 +164,7 @@ describe("colorizeWorkflow", () => {
     const { colorizeWorkflow } = await load();
     const result = colorizeWorkflow("\x1b[1mworkflow\x1b[0m", 0);
     // The bold marker should survive
-    assert.ok(result.includes("\x1b[1m"));
+    assert.ok(result.includes("\x1b[1m"), "should contain \x1b[1m");
     // work around the trigger letters — the rainbow wraps individual chars
   });
 
@@ -193,20 +193,20 @@ describe("buildForcedWorkflowPrompt", () => {
   it("includes the original text", async () => {
     const { buildForcedWorkflowPrompt } = await load();
     const result = buildForcedWorkflowPrompt("hello world");
-    assert.ok(result.startsWith("hello world"));
+    assert.ok(result.startsWith("hello world"), "should start with hello world");
   });
 
   it("includes the directive", async () => {
     const { buildForcedWorkflowPrompt } = await load();
     const result = buildForcedWorkflowPrompt("test");
-    assert.ok(result.includes("tool named exactly `workflow`"));
-    assert.ok(result.includes("MUST"));
+    assert.ok(result.includes("tool named exactly `workflow`"), "should contain tool named exactly `workflow");
+    assert.ok(result.includes("MUST"), "should contain MUST");
   });
 
   it("is a multi-line string", async () => {
     const { buildForcedWorkflowPrompt } = await load();
     const result = buildForcedWorkflowPrompt("test");
-    assert.ok(result.includes("\n"));
-    assert.ok(result.includes("---"));
+    assert.ok(result.includes("\n"), "should contain \n");
+    assert.ok(result.includes("---"), "should contain ---");
   });
 });

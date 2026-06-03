@@ -152,7 +152,7 @@ describe("workflows-models-command", () => {
 
       saveModelTierConfig(config, cfgPath);
       const loaded = loadModelTierConfig(cfgPath);
-      assert.ok(loaded);
+      assert.ok(loaded, "should load successfully");
       assert.equal(loaded?.tiers.small, "gpt-4.1-mini");
       assert.equal(loaded?.tiers.medium, "gpt-4.1");
       assert.equal(loaded?.tiers.big, "gpt-5");

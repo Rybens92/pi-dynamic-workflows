@@ -199,7 +199,7 @@ test(
       startedAt: "2024-01-01T00:00:00.000Z",
       updatedAt: "2024-01-01T00:00:00.000Z",
     });
-    assert.ok(existsSync(join(cwd, WORKFLOW_RUNS_DIR, "delete-me.json")));
+    assert.ok(existsSync(join(cwd, WORKFLOW_RUNS_DIR, "delete-me.json")), "existsSync() should succeed");
     const deleted = rp.delete("delete-me");
     assert.equal(deleted, true);
     assert.equal(rp.load("delete-me"), null);

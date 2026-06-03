@@ -77,7 +77,7 @@ test("generateCodebaseAuditWorkflow includes validator and report phases", () =>
 test("generateCodebaseAuditWorkflow escapes single quotes in scope", () => {
   const body = generateCodebaseAuditWorkflow("it's a test", ["check"]);
   // Should not contain unescaped quotes that would break the script
-  assert.ok(!body.includes("it's") || body.includes("it\\'s"));
+  assert.ok(!body.includes("it's") || body.includes("it\\'s"), "should not contain it's");
 });
 
 test("generateCodebaseAuditWorkflow truncates long scope names", () => {

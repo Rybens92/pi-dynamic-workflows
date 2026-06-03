@@ -74,7 +74,7 @@ describe("renderWorkflowText", () => {
   it("includes workflow name in output", async () => {
     const { createWorkflowSnapshot, renderWorkflowText } = await loadDisplay();
     const text = renderWorkflowText(createWorkflowSnapshot(fakeMeta("audit-all")));
-    assert.ok(text.includes("audit-all"));
+    assert.ok(text.includes("audit-all"), "should contain audit-all");
   });
 
   it("includes phase names", async () => {
@@ -82,8 +82,8 @@ describe("renderWorkflowText", () => {
     const snap = createWorkflowSnapshot(fakeMeta("t", "d", ["Phase1", "Phase2"]));
     snap.agents = [agent(1, "agent-1", "done", "Phase1")] as never[];
     const text = renderWorkflowText(snap);
-    assert.ok(text.includes("Phase1"));
-    assert.ok(text.includes("Phase2"));
+    assert.ok(text.includes("Phase1"), "should contain Phase1");
+    assert.ok(text.includes("Phase2"), "should contain Phase2");
   });
 
   it("includes agent labels", async () => {
@@ -91,7 +91,7 @@ describe("renderWorkflowText", () => {
     const snap = createWorkflowSnapshot(fakeMeta());
     snap.agents = [agent(1, "inventory", "done", "Research")] as never[];
     const text = renderWorkflowText(snap);
-    assert.ok(text.includes("inventory"));
+    assert.ok(text.includes("inventory"), "should contain inventory");
   });
 
   it("shows agent count and done count", async () => {
@@ -154,7 +154,7 @@ describe("renderWorkflowText", () => {
     snap.agents = [agent(1, "orphan", "done")] as never[];
     const text = renderWorkflowLines(snap).join("\n");
     assert.ok(text.includes("Unphased"), "should show unphased section");
-    assert.ok(text.includes("orphan"));
+    assert.ok(text.includes("orphan"), "should contain orphan");
   });
 
   it("shows agent tokens when available", async () => {
@@ -312,7 +312,7 @@ describe("createToolUpdateWorkflowDisplay lifecycle", () => {
 
     assert.equal(onUpdate.mock.callCount(), 1);
     const [{ content }] = onUpdate.mock.calls[0].arguments;
-    assert.ok(Array.isArray(content));
+    assert.ok(Array.isArray(content), "content should be an array");
     assert.equal(content[0].type, "text");
     assert.ok(content[0].text.includes("Workflow"), "should include workflow status text");
   });
@@ -405,7 +405,7 @@ describe("display pure helpers", () => {
     const { preview } = await loadDisplay();
     const result = preview("x".repeat(200));
     assert.ok(result.length <= 85, "should truncate with max 80 + …");
-    assert.ok(result.endsWith("…"));
+    assert.ok(result.endsWith("…"), "should end with …");
   });
 
   it("preview accepts custom max length", async () => {
@@ -418,8 +418,8 @@ describe("display pure helpers", () => {
     const { preview } = await loadDisplay();
     const arr = [1, 2, 3, 4, 5];
     const result = preview(arr, 50);
-    assert.ok(result.length > 0);
-    assert.ok(result.includes("1"));
+    assert.ok(result.length > 0, "result should not be empty");
+    assert.ok(result.includes("1"), "should contain 1");
   });
 
   it("statusIcon returns correct icons per status", async () => {
@@ -524,7 +524,7 @@ describe("deliverText", () => {
       },
     });
     const text = deliverText(run);
-    assert.ok(text.includes("Everything is fine"));
+    assert.ok(text.includes("Everything is fine"), "should contain Everything is fine");
   });
 
   it("handles null result gracefully", async () => {
@@ -591,8 +591,8 @@ describe("backgroundStartedText", () => {
   it("includes workflow name and run ID", async () => {
     const { backgroundStartedText } = await loadTool();
     const text = backgroundStartedText("deep-research", "run-xyz");
-    assert.ok(text.includes("deep-research"));
-    assert.ok(text.includes("run-xyz"));
+    assert.ok(text.includes("deep-research"), "should contain deep-research");
+    assert.ok(text.includes("run-xyz"), "should contain run-xyz");
   });
 
   it("tells the user the workflow is in the background", async () => {
@@ -674,8 +674,8 @@ describe("renderWorkflowLines edge cases", () => {
       agent(3, "a3", "running", "Beta"),
     ] as never[];
     const text = renderWorkflowLines(recomputeWorkflowSnapshot(snap)).join("\n");
-    assert.ok(text.includes("Alpha"));
-    assert.ok(text.includes("Beta"));
+    assert.ok(text.includes("Alpha"), "should contain Alpha");
+    assert.ok(text.includes("Beta"), "should contain Beta");
     assert.ok(text.includes("running"), "should show running in Beta");
   });
 
@@ -683,7 +683,7 @@ describe("renderWorkflowLines edge cases", () => {
     const { createWorkflowSnapshot, renderWorkflowLines } = await loadDisplay();
     const snap = createWorkflowSnapshot(fakeMeta("check-everything"));
     const lines = renderWorkflowLines(snap);
-    assert.ok(lines[0].includes("check-everything"));
+    assert.ok(lines[0].includes("check-everything"), "should contain check-everything");
   });
 });
 

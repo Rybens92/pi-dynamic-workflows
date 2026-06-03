@@ -143,7 +143,7 @@ test("/workflows status watches a running run: live status bar + prints on compl
   registerWorkflowCommands(pi, manager);
   const ctx = { ui: { notify: () => {}, setStatus: (_k: string, t?: string) => statusLine.push(t) } };
 
-  assert.ok(handler);
+  assert.ok(handler, "handler should exist");
   await handler("status run-1", ctx);
   assert.ok(
     statusLine.some((s) => typeof s === "string"),

@@ -11,7 +11,7 @@ test("shouldUseWorkflow returns disabled when enabled=false", () => {
 test("shouldUseWorkflow matches explicit trigger keywords", () => {
   const result = shouldUseWorkflow("workflow to process all files");
   assert.equal(result.useWorkflow, true);
-  assert.ok(result.confidence > 0.5);
+  assert.ok(result.confidence > 0.5, "result.confidence should be greater than 0.5");
 });
 
 test("shouldUseWorkflow matches workflows keyword", () => {
@@ -44,7 +44,7 @@ test("shouldUseWorkflow triggers on high complexity with many subtask indicators
     "first do this, then do that, finally wrap up, analyze all files, next verify each component, also check the results",
   );
   assert.equal(result.useWorkflow, true);
-  assert.ok(result.confidence > 0);
+  assert.ok(result.confidence > 0, "result.confidence should be greater than 0");
 });
 
 test("shouldUseWorkflow returns false for simple tasks", () => {
@@ -80,12 +80,12 @@ test("shouldUseWorkflow triggers on 'sweep' keyword", () => {
 test("shouldUseWorkflow returns reason string", () => {
   const result = shouldUseWorkflow("workflow task");
   assert.equal(typeof result.reason, "string");
-  assert.ok(result.reason.length > 0);
+  assert.ok(result.reason.length > 0, "result.reason should not be empty");
 });
 
 test("shouldUseWorkflow high confidence with multiple keywords", () => {
   const result = shouldUseWorkflow("workflow to audit and migrate all files in parallel");
-  assert.ok(result.confidence > 0.7);
+  assert.ok(result.confidence > 0.7, "result.confidence should be greater than 0.7");
 });
 
 test("shouldUseWorkflow can be configured with custom keywords", () => {
@@ -102,7 +102,7 @@ test("shouldUseWorkflow does not trigger on numeric item count alone (need more 
   const result = shouldUseWorkflow("check 50 files for issues");
   // Single numeric indicator alone (weight 2) doesn't reach threshold 7
   assert.equal(result.useWorkflow, false);
-  assert.ok(result.confidence <= 0.3);
+  assert.ok(result.confidence <= 0.3, "result.confidence should be at most 0.3");
 });
 
 test("shouldUseWorkflow triggers on 'across' with multiple indicators", () => {
@@ -119,26 +119,26 @@ test("shouldUseWorkflow triggers on 'refactor' with multiple indicators", () => 
 
 test("suggestWorkflowScript returns a valid parseable script", () => {
   const script = suggestWorkflowScript("analyze all source files");
-  assert.ok(script.startsWith("export const meta = {"));
-  assert.ok(script.includes("name: 'auto_generated'"));
-  assert.ok(script.includes("description: 'analyze all source files'"));
-  assert.ok(script.includes("agent("));
-  assert.ok(script.includes("phase("));
-  assert.ok(script.includes("parallel("));
-  assert.ok(script.includes("return {"));
+  assert.ok(script.startsWith("export const meta = {"), "should start with export const meta = {");
+  assert.ok(script.includes("name: 'auto_generated'"), "should contain name: 'auto_generated");
+  assert.ok(script.includes("description: 'analyze all source files'"), "should contain description: 'analyze all source files");
+  assert.ok(script.includes("agent("), "should contain agent(");
+  assert.ok(script.includes("phase("), "should contain phase(");
+  assert.ok(script.includes("parallel("), "should contain parallel(");
+  assert.ok(script.includes("return {"), "should contain return {");
 });
 
 test("suggestWorkflowScript includes phases: Analyze, Execute, Verify", () => {
   const script = suggestWorkflowScript("test");
-  assert.ok(script.includes("Analyze"));
-  assert.ok(script.includes("Execute"));
-  assert.ok(script.includes("Verify"));
+  assert.ok(script.includes("Analyze"), "should contain Analyze");
+  assert.ok(script.includes("Execute"), "should contain Execute");
+  assert.ok(script.includes("Verify"), "should contain Verify");
 });
 
 test("suggestWorkflowScript escapes single quotes in description", () => {
   const script = suggestWorkflowScript("it's a test");
-  assert.ok(!script.includes("it's")); // should be escaped
-  assert.ok(script.includes("it\\'s")); // escaped version
+  assert.ok(!script.includes("it's"), "should not contain it's");  // should be escaped
+  assert.ok(script.includes("it\\'s"), "should contain it\\'s");  // escaped version
 });
 
 test("suggestWorkflowScript truncates long descriptions", () => {
@@ -146,12 +146,12 @@ test("suggestWorkflowScript truncates long descriptions", () => {
   const script = suggestWorkflowScript(long);
   // Description should be <= 100 chars
   const descMatch = script.match(/description: '([^']+)'/);
-  assert.ok(descMatch);
-  assert.ok(descMatch[1].length <= 100);
+  assert.ok(descMatch, "should match description pattern");
+  assert.ok(descMatch[1].length <= 100, "length should be at most 100");
 });
 
 test("suggestWorkflowScript always returns a string", () => {
   const result = suggestWorkflowScript("");
   assert.equal(typeof result, "string");
-  assert.ok(result.length > 0);
+  assert.ok(result.length > 0, "result should not be empty");
 });

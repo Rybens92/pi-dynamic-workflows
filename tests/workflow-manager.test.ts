@@ -255,7 +255,7 @@ test(
   withTempCwd(async (cwd) => {
     const manager = new WorkflowManager({ cwd });
     const p = manager.getPersistence();
-    assert.ok(p);
+    assert.ok(p, "p should be truthy");
     assert.equal(typeof p.save, "function");
     assert.equal(typeof p.list, "function");
   }),
@@ -465,7 +465,7 @@ return { a, b }`;
 
     // Verify the error is a WorkflowError
     const managedRun = manager.getRun(runId);
-    assert.ok(managedRun?.error instanceof WorkflowError);
+    assert.ok(managedRun?.error instanceof WorkflowError, "error should be instance of WorkflowError");
     assert.equal((managedRun.error as WorkflowError).code, WorkflowErrorCode.WORKFLOW_ABORTED);
   }),
 );
@@ -862,8 +862,8 @@ test(
     const snap = manager.getSnapshot(runId);
     assert.equal(snap?.name, "tracked_demo");
     assert.equal(snap?.description, "one agent");
-    assert.ok(Array.isArray(snap?.phases));
-    assert.ok(Array.isArray(snap?.logs));
+    assert.ok(Array.isArray(snap?.phases), "snap.phases should be an array");
+    assert.ok(Array.isArray(snap?.logs), "snap.logs should be an array");
     await promise.catch(() => {});
   }),
 );
@@ -977,7 +977,7 @@ test(
     }
 
     assert.ok(capturedError, "error event should fire on abort");
-    assert.ok(capturedError?.error instanceof WorkflowError);
+    assert.ok(capturedError?.error instanceof WorkflowError, "error should be instance of WorkflowError");
     assert.equal(capturedError?.error.code, WorkflowErrorCode.WORKFLOW_ABORTED);
   }),
 );

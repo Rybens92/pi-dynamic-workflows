@@ -23,12 +23,12 @@ test("listAvailableModelSpecs entries have provider/model format when non-empty"
 
 test("WorkflowAgent constructor accepts options", () => {
   const agent = new WorkflowAgent({ cwd: "/tmp" });
-  assert.ok(agent instanceof WorkflowAgent);
+  assert.ok(agent instanceof WorkflowAgent, "agent should be instance of WorkflowAgent");
 });
 
 test("WorkflowAgent constructor works without options", () => {
   const agent = new WorkflowAgent();
-  assert.ok(agent instanceof WorkflowAgent);
+  assert.ok(agent instanceof WorkflowAgent, "agent should be instance of WorkflowAgent");
 });
 
 test("WorkflowAgent with custom instructions", () => {
@@ -36,7 +36,7 @@ test("WorkflowAgent with custom instructions", () => {
     cwd: "/tmp",
     instructions: "custom instruction",
   });
-  assert.ok(agent instanceof WorkflowAgent);
+  assert.ok(agent instanceof WorkflowAgent, "agent should be instance of WorkflowAgent");
 });
 
 test("WorkflowAgent constructor handles all option combinations gracefully", () => {
@@ -46,7 +46,7 @@ test("WorkflowAgent constructor handles all option combinations gracefully", () 
     session: {},
     instructions: "test",
   });
-  assert.ok(agent instanceof WorkflowAgent);
+  assert.ok(agent instanceof WorkflowAgent, "agent should be instance of WorkflowAgent");
 });
 
 test("WorkflowAgent constructor accepts mainModel option", () => {
@@ -54,7 +54,7 @@ test("WorkflowAgent constructor accepts mainModel option", () => {
     cwd: "/tmp",
     mainModel: "openai/gpt-4.1",
   });
-  assert.ok(agent instanceof WorkflowAgent);
+  assert.ok(agent instanceof WorkflowAgent, "agent should be instance of WorkflowAgent");
 });
 
 test("WorkflowAgent constructor handles all options including mainModel", () => {
@@ -65,7 +65,7 @@ test("WorkflowAgent constructor handles all options including mainModel", () => 
     instructions: "test",
     mainModel: "openai/gpt-4.1",
   });
-  assert.ok(agent instanceof WorkflowAgent);
+  assert.ok(agent instanceof WorkflowAgent, "agent should be instance of WorkflowAgent");
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -100,15 +100,15 @@ test("buildPrompt injects structured output contract when schema is used", () =>
 test("buildPrompt works without base instructions", () => {
   const agent = new WorkflowAgent({ cwd: "/tmp" });
   const built: string = (agent as any).buildPrompt("hello", { label: "greeter" }, false);
-  assert.ok(built.includes("Task label: greeter"));
-  assert.ok(built.includes("hello"));
+  assert.ok(built.includes("Task label: greeter"), "should contain Task label: greeter");
+  assert.ok(built.includes("hello"), "should contain hello");
 });
 
 test("buildPrompt works without label", () => {
   const agent = new WorkflowAgent({ cwd: "/tmp", instructions: "Help." });
   const built: string = (agent as any).buildPrompt("hello", {}, false);
-  assert.ok(built.includes("Help."));
-  assert.ok(built.includes("hello"));
+  assert.ok(built.includes("Help."), "should contain Help.");
+  assert.ok(built.includes("hello"), "should contain hello");
   assert.ok(!built.includes("Task label:"), "no label when omitted");
 });
 
@@ -344,7 +344,7 @@ test("agent() passes onModelResolved callback for display model updates", async 
       },
     },
   );
-  assert.ok(rec.calls.length > 0);
+  assert.ok(rec.calls.length > 0, "rec.calls should not be empty");
 });
 
 test("agent() accumulates usage across multiple agents", async () => {

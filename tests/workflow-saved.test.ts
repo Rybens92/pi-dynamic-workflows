@@ -38,7 +38,7 @@ test(
     });
     assert.equal(saved.name, "test-wf");
     assert.equal(saved.location, "project");
-    assert.ok(saved.path.endsWith("test-wf.json"));
+    assert.ok(saved.path.endsWith("test-wf.json"), "should end with test-wf.json");
     assert.ok(saved.savedAt, "should have savedAt timestamp");
     const dir = join(cwd, WORKFLOW_SAVED_DIR);
     assert.ok(existsSync(dir), "project saved dir should exist");
@@ -59,7 +59,7 @@ test(
       "user",
     );
     assert.equal(saved.location, "user");
-    assert.ok(saved.path.includes(".pi/workflows/saved"));
+    assert.ok(saved.path.includes(".pi/workflows/saved"), "should contain .pi/workflows/saved");
   }),
 );
 
@@ -108,7 +108,7 @@ test(
       "user",
     );
     const loaded = storage.load("user-only");
-    assert.ok(loaded);
+    assert.ok(loaded, "should load successfully");
     assert.equal(loaded?.script, "user script");
     assert.equal(loaded?.location, "user");
   }),
@@ -144,7 +144,7 @@ test(
   withIsolatedHome(async (cwd) => {
     const storage = createWorkflowStorage(cwd);
     storage.save({ name: "to-delete", description: "d", script: "d" });
-    assert.ok(storage.load("to-delete"));
+    assert.ok(storage.load("to-delete"), "load() should succeed");
     const deleted = storage.delete("to-delete");
     assert.equal(deleted, true);
     assert.equal(storage.load("to-delete"), null);
@@ -165,7 +165,7 @@ test(
     const storage = createWorkflowStorage(cwd);
     storage.save({ name: "both", description: "p", script: "p" });
     storage.save({ name: "both", description: "u", script: "u" }, "user");
-    assert.ok(storage.load("both"));
+    assert.ok(storage.load("both"), "load() should succeed");
     // Delete only from project
     const deleted = storage.delete("both", "project");
     assert.equal(deleted, true);
@@ -189,7 +189,7 @@ test(
         limit: { type: "number", description: "Max results", default: 10 },
       },
     });
-    assert.ok(saved.parameters);
+    assert.ok(saved.parameters, "parameters should be truthy");
     assert.equal(saved.parameters?.input.type, "string");
     assert.equal(saved.parameters?.input.required, true);
     assert.equal(saved.parameters?.limit.default, 10);
@@ -213,8 +213,8 @@ test(
     assert.equal(raw.name, "check-json");
     assert.equal(raw.description, "desc");
     assert.equal(raw.script, "export const meta = { name: 'c', description: 'c' }");
-    assert.ok(raw.savedAt);
-    assert.ok(raw.path);
+    assert.ok(raw.savedAt, "savedAt should be truthy");
+    assert.ok(raw.path, "path should be truthy");
   }),
 );
 
@@ -230,7 +230,7 @@ test(
     const loaded = storage.load("corrupted");
     assert.equal(loaded, null, "corrupted file returns null");
     const list = storage.list();
-    assert.ok(Array.isArray(list));
+    assert.ok(Array.isArray(list), "list should be an array");
     assert.equal(list.length, 0); // only corrupted file
   }),
 );

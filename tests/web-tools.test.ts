@@ -8,9 +8,9 @@ test("createWebSearchTool has correct name and metadata", () => {
   const tool = createWebSearchTool();
   assert.equal(tool.name, "web_search");
   assert.equal(tool.label, "Web Search");
-  assert.ok(tool.description);
-  assert.ok(tool.promptSnippet);
-  assert.ok(tool.parameters);
+  assert.ok(tool.description, "description should be truthy");
+  assert.ok(tool.promptSnippet, "promptSnippet should be truthy");
+  assert.ok(tool.parameters, "parameters should be truthy");
 });
 
 test("createWebSearchTool has execute function", () => {
@@ -26,7 +26,7 @@ test("createWebSearchTool tool has parameters with query field", () => {
 test("createWebSearchTool has default count", () => {
   const tool = createWebSearchTool();
   // Verify the tool definition has the right shape
-  assert.ok(tool.parameters);
+  assert.ok(tool.parameters, "parameters should be truthy");
 });
 
 // ─── createWebFetchTool ────────────────────────────────────────────────────────
@@ -35,9 +35,9 @@ test("createWebFetchTool has correct name and metadata", () => {
   const tool = createWebFetchTool();
   assert.equal(tool.name, "web_fetch");
   assert.equal(tool.label, "Web Fetch");
-  assert.ok(tool.description);
-  assert.ok(tool.promptSnippet);
-  assert.ok(tool.parameters);
+  assert.ok(tool.description, "description should be truthy");
+  assert.ok(tool.promptSnippet, "promptSnippet should be truthy");
+  assert.ok(tool.parameters, "parameters should be truthy");
 });
 
 test("createWebFetchTool has execute function", () => {
@@ -63,7 +63,7 @@ test("createWebFetchTool has parameters with url field", () => {
 test("createWebTools returns both tools in correct order", () => {
   const tools = createWebTools();
   assert.equal(tools.length, 2);
-  assert.ok(Array.isArray(tools));
+  assert.ok(Array.isArray(tools), "tools should be an array");
   const names = tools.map((t) => t.name).sort();
   assert.deepEqual(names, ["web_fetch", "web_search"]);
 });

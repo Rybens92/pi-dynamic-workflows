@@ -179,22 +179,22 @@ test("NavigatorState drills runs -> phases -> agents -> detail and back", () => 
   const state = new NavigatorState();
   assert.equal(state.kind, "runs");
 
-  assert.ok(state.drill(model));
+  assert.ok(state.drill(model), "drill() should succeed");
   assert.equal(state.kind, "phases");
   assert.equal(state.runId, "run-1");
 
-  assert.ok(state.drill(model));
+  assert.ok(state.drill(model), "drill() should succeed");
   assert.equal(state.kind, "agents");
   assert.equal(state.phase, "Scan");
 
-  assert.ok(state.drill(model));
+  assert.ok(state.drill(model), "drill() should succeed");
   assert.equal(state.kind, "detail");
   assert.equal(state.agentId, 1);
 
-  assert.ok(state.back());
+  assert.ok(state.back(), "back() should succeed");
   assert.equal(state.kind, "agents");
-  assert.ok(state.back());
-  assert.ok(state.back());
+  assert.ok(state.back(), "back() should succeed");
+  assert.ok(state.back(), "back() should succeed");
   assert.equal(state.kind, "runs");
   assert.equal(state.back(), false, "back at top returns false (caller closes)");
 });
@@ -432,7 +432,7 @@ test("NavigatorState drill on saved item opens savedDetail", () => {
   state.cursor = 1;
 
   const drilled = state.drill(model);
-  assert.ok(drilled);
+  assert.ok(drilled, "should have drilled into model");
   assert.equal(state.kind, "savedDetail");
   assert.equal(state.savedName, "analyze");
 });
@@ -443,11 +443,11 @@ test("NavigatorState drill on saved item goes to savedDetail then back to runs",
 
   // Move cursor to first saved item and drill
   state.move(1, 4);
-  assert.ok(state.drill(model));
+  assert.ok(state.drill(model), "drill() should succeed");
   assert.equal(state.kind, "savedDetail");
 
   // Back to runs
-  assert.ok(state.back());
+  assert.ok(state.back(), "back() should succeed");
   assert.equal(state.kind, "runs");
 });
 

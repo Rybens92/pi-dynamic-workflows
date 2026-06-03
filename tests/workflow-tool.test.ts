@@ -24,8 +24,8 @@ test("createWorkflowTool has correct name and label", () => {
 
 test("createWorkflowTool has description", () => {
   const tool = createWorkflowTool();
-  assert.ok(tool.description);
-  assert.ok(tool.description.length > 20);
+  assert.ok(tool.description, "description should be truthy");
+  assert.ok(tool.description.length > 20, "tool.description should be more than 20");
 });
 
 test("createWorkflowTool has parameters defined", () => {
@@ -46,13 +46,13 @@ test("createWorkflowTool has renderCall and renderResult", () => {
 
 test("createWorkflowTool has promptSnippet", () => {
   const tool = createWorkflowTool();
-  assert.ok(tool.promptSnippet);
-  assert.ok(tool.promptSnippet.includes("workflow"));
+  assert.ok(tool.promptSnippet, "promptSnippet should be truthy");
+  assert.ok(tool.promptSnippet.includes("workflow"), "should contain workflow");
 });
 
 test("createWorkflowTool has promptGuidelines array", () => {
   const tool = createWorkflowTool();
-  assert.ok(Array.isArray(tool.promptGuidelines));
+  assert.ok(Array.isArray(tool.promptGuidelines), "tool.promptGuidelines should be an array");
   assert.ok(tool.promptGuidelines.length > 5, "should have several guidelines");
 });
 
@@ -75,9 +75,9 @@ test("modelRoutingGuideline mentions all three tier names", () => {
 
 test("modelRoutingGuideline describes each tier purpose", () => {
   const text = modelRoutingGuideline();
-  assert.ok(text.includes("lightweight"));
-  assert.ok(text.includes("balanced"));
-  assert.ok(text.includes("synthesis"));
+  assert.ok(text.includes("lightweight"), "should contain lightweight");
+  assert.ok(text.includes("balanced"), "should contain balanced");
+  assert.ok(text.includes("synthesis"), "should contain synthesis");
 });
 
 test("modelRoutingGuideline explains tier vs model priority", () => {

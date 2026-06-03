@@ -86,12 +86,12 @@ describe("installResultDelivery", () => {
     const calls = (pi as unknown as { _calls: { content: string }[] })._calls;
     assert.equal(calls.length, 1);
     assert.equal(calls[0].customType, "workflow-result");
-    assert.ok(calls[0].content.includes("All tests passed"));
-    assert.ok(calls[0].content.includes("test-workflow"));
-    assert.ok(calls[0].content.includes("3 agents"));
+    assert.ok(calls[0].content.includes("All tests passed"), "should contain All tests passed");
+    assert.ok(calls[0].content.includes("test-workflow"), "should contain test-workflow");
+    assert.ok(calls[0].content.includes("3 agents"), "should contain 3 agents");
     // locale may format as 50,000 / 50.000 / 50 000
     assert.ok(/50\s*000/.test(calls[0].content), "should contain 50000 tokens formatted");
-    assert.ok(calls[0].content.includes("1.5s"));
+    assert.ok(calls[0].content.includes("1.5s"), "should contain 1.5s");
   });
 
   // ── deliverText: fallback chain ──
@@ -105,7 +105,7 @@ describe("installResultDelivery", () => {
     manager.emit("complete", { runId: "test-run-1" });
 
     const calls = (pi as unknown as { _calls: { content: string }[] })._calls;
-    assert.ok(calls[0].content.includes("Report body"));
+    assert.ok(calls[0].content.includes("Report body"), "should contain Report body");
   });
 
   it("falls back to summary when verdict and report are absent", () => {
@@ -117,7 +117,7 @@ describe("installResultDelivery", () => {
     manager.emit("complete", { runId: "test-run-1" });
 
     const calls = (pi as unknown as { _calls: { content: string }[] })._calls;
-    assert.ok(calls[0].content.includes("Short summary"));
+    assert.ok(calls[0].content.includes("Short summary"), "should contain Short summary");
   });
 
   it("falls back to string result when result is a plain string", () => {
@@ -129,7 +129,7 @@ describe("installResultDelivery", () => {
     manager.emit("complete", { runId: "test-run-1" });
 
     const calls = (pi as unknown as { _calls: { content: string }[] })._calls;
-    assert.ok(calls[0].content.includes("Plain string result"));
+    assert.ok(calls[0].content.includes("Plain string result"), "should contain Plain string result");
   });
 
   it("falls back to truncated JSON when result is an object with no known key", () => {
@@ -141,8 +141,8 @@ describe("installResultDelivery", () => {
     manager.emit("complete", { runId: "test-run-1" });
 
     const calls = (pi as unknown as { _calls: { content: string }[] })._calls;
-    assert.ok(calls[0].content.includes("foo"));
-    assert.ok(calls[0].content.includes("…(truncated)"));
+    assert.ok(calls[0].content.includes("foo"), "should contain foo");
+    assert.ok(calls[0].content.includes("…(truncated)"), "should contain …(truncated)");
   });
 
   it("falls back gracefully when result is nullish", () => {
@@ -190,7 +190,7 @@ describe("installResultDelivery", () => {
     mod.installResultDelivery(pi as unknown as ExtensionAPI, manager);
     // Should not throw — stale ctx is silently swallowed
     manager.emit("complete", { runId: "test-run-1" });
-    assert.ok(true); // reached without crash
+    assert.ok(true, "should not throw");  // reached without crash
   });
 
   // ── Only background runs are delivered ──
@@ -218,8 +218,8 @@ describe("installResultDelivery", () => {
 
     const calls = (pi as unknown as { _calls: { content: string }[] })._calls;
     assert.equal(calls.length, 1);
-    assert.ok(calls[0].content.includes("failed"));
-    assert.ok(calls[0].content.includes("Something went wrong"));
+    assert.ok(calls[0].content.includes("failed"), "should contain failed");
+    assert.ok(calls[0].content.includes("Something went wrong"), "should contain Something went wrong");
   });
 
   it("skips error delivery for foreground runs", () => {
