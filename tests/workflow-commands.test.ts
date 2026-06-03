@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import test from "node:test";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { WorkflowManager } from "../src/workflow-manager.js";
 import { registerWorkflowCommands } from "../src/workflow-commands.js";
 
 type Handler = (args: string, ctx: any) => Promise<void>;
@@ -12,7 +14,7 @@ function harness(managerOverrides: Record<string, any> = {}) {
   const calls: string[] = [];
   let handler: Handler | undefined;
 
-  const pi: any = {
+  const pi: Partial<ExtensionAPI> = {
     getCommands: () => [],
     registerCommand: (_name: string, opts: { handler: Handler }) => {
       handler = opts.handler;
@@ -22,7 +24,7 @@ function harness(managerOverrides: Record<string, any> = {}) {
     },
   };
 
-  const manager: any = {
+  const manager: Partial<WorkflowManager> = {
     listRuns: () => [],
     getSnapshot: () => null,
     getRun: () => undefined,
@@ -45,7 +47,7 @@ function harness(managerOverrides: Record<string, any> = {}) {
     ...managerOverrides,
   };
 
-  registerWorkflowCommands(pi, manager);
+  registerWorkflowCommands(pi as unknown as ExtensionAPI, manager as unknown as WorkflowManager);
   const ctx = { ui: { notify: (message: string, type?: string) => notified.push({ message, type }) } };
   const run = (args: string) => {
     if (!handler) throw new Error("command not registered");
@@ -103,13 +105,13 @@ test("/workflows status without id warns", async () => {
 
 test("registerWorkflowCommands is idempotent (skips when already registered)", () => {
   let registrations = 0;
-  const pi: any = {
+  const pi: Partial<ExtensionAPI> = {
     getCommands: () => [{ name: "workflows" }],
     registerCommand: () => {
       registrations++;
     },
   };
-  registerWorkflowCommands(pi, {} as any);
+  registerWorkflowCommands(pi as unknown as ExtensionAPI, {} as unknown as WorkflowManager);
   assert.equal(registrations, 0);
 });
 
@@ -140,7 +142,7 @@ test("/workflows status watches a running run: live status bar + prints on compl
     },
     sendMessage: async (m: any) => printed.push(m.content),
   };
-  registerWorkflowCommands(pi, manager);
+  registerWorkflowCommands(pi as unknown as ExtensionAPI, manager as unknown as WorkflowManager);
   const ctx = { ui: { notify: () => {}, setStatus: (_k: string, t?: string) => statusLine.push(t) } };
 
   assert.ok(handler, "handler should exist");
@@ -297,10 +299,10 @@ test("/workflows save <name> saves the most recent run with a script", async () 
     save: (w: any) => { saved.push(w); return { ...w, id: "saved-1" }; },
   };
   registerWorkflowCommands(
-    { getCommands: () => [], registerCommand: (_n: string, o: any) => {}, sendMessage: async () => {} } as any,
+    { getCommands: () => [], registerCommand: (_n: string, o: any) => {}, sendMessage: async () => {} } as unknown as ExtensionAPI,
     { listRuns: () => [
       { runId: "recent", workflowName: "scan", status: "completed", script: "export const meta = { name: 'scan', description: 'scan' }", agents: [], logs: [] },
-    ], getSnapshot: () => null, getRun: () => undefined, pause: () => false, resume: async () => false, stop: () => false, deleteRun: () => false } as any,
+    ], getSnapshot: () => null, getRun: () => undefined, pause: () => false, resume: async () => false, stop: () => false, deleteRun: () => false } as unknown as WorkflowManager,
     { storage },
   );
 
@@ -322,8 +324,8 @@ test("/workflows save <name> <runId> saves the specified run", async () => {
   const notified: Array<{ message: string; type?: string }> = [];
   let handler: any;
   reg2(
-    { getCommands: () => [{ name: "xxx" }], registerCommand: (_n: string, o: any) => { handler = o.handler; }, sendMessage: async () => {} } as any,
-    { listRuns: () => runs, getSnapshot: () => null, getRun: () => undefined, pause: () => false, resume: async () => false, stop: () => false, deleteRun: () => false } as any,
+    { getCommands: () => [{ name: "xxx" }], registerCommand: (_n: string, o: any) => { handler = o.handler; }, sendMessage: async () => {} } as unknown as ExtensionAPI,
+    { listRuns: () => runs, getSnapshot: () => null, getRun: () => undefined, pause: () => false, resume: async () => false, stop: () => false, deleteRun: () => false } as unknown as WorkflowManager,
     { storage },
   );
 
@@ -342,8 +344,8 @@ test("/workflows save <name> <runId> warns when run has no script", async () => 
   const { registerWorkflowCommands: reg3 } = await import("../src/workflow-commands.js");
   const notified: Array<{ message: string; type?: string }> = [];
   reg3(
-    { getCommands: () => [{ name: "xxx" }], registerCommand: (_n: string, o: any) => { handler = o.handler; }, sendMessage: async () => {} } as any,
-    { listRuns: () => [{ runId: "no-script", workflowName: "empty", status: "completed", agents: [], logs: [] }], getSnapshot: () => null, getRun: () => undefined, pause: () => false, resume: async () => false, stop: () => false, deleteRun: () => false } as any,
+    { getCommands: () => [{ name: "xxx" }], registerCommand: (_n: string, o: any) => { handler = o.handler; }, sendMessage: async () => {} } as unknown as ExtensionAPI,
+    { listRuns: () => [{ runId: "no-script", workflowName: "empty", status: "completed", agents: [], logs: [] }], getSnapshot: () => null, getRun: () => undefined, pause: () => false, resume: async () => false, stop: () => false, deleteRun: () => false } as unknown as WorkflowManager,
     { storage },
   );
 
