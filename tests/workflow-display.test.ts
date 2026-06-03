@@ -13,11 +13,12 @@
 
 import assert from "node:assert/strict";
 import { describe, it, mock } from "node:test";
+import type { WorkflowMeta } from "../src/workflow.js";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function fakeMeta(name = "test-wf", desc = "test description", phases: string[] = ["Research", "Build", "Verify"]) {
-  return { name, description: desc, phases: phases.map((t) => ({ title: t })) } as never;
+function fakeMeta(name = "test-wf", desc = "test description", phases: string[] = ["Research", "Build", "Verify"]): WorkflowMeta {
+  return { name, description: desc, phases: phases.map((t) => ({ title: t })) };
 }
 
 function agent(
@@ -142,7 +143,7 @@ describe("renderWorkflowText", () => {
 
   it("shows skipped agents in phase line", async () => {
     const { createWorkflowSnapshot, renderWorkflowLines, recomputeWorkflowSnapshot } = await loadDisplay();
-    const snap = recomputeWorkflowSnapshot(createWorkflowSnapshot(fakeMeta("t", "d", ["Phase"])) as any);
+    const snap = recomputeWorkflowSnapshot(createWorkflowSnapshot(fakeMeta("t", "d", ["Phase"])));
     snap.agents = [agent(1, "a1", "done", "Phase"), agent(2, "a2", "skipped", "Phase")] as never[];
     const text = renderWorkflowLines(recomputeWorkflowSnapshot(snap)).join("\n");
     assert.ok(text.includes("1 skipped"), "should show skipped count");

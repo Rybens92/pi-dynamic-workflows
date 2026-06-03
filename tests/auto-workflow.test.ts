@@ -8,36 +8,25 @@ test("shouldUseWorkflow returns disabled when enabled=false", () => {
   assert.equal(result.confidence, 0);
 });
 
-test("shouldUseWorkflow matches explicit trigger keywords", () => {
-  const result = shouldUseWorkflow("workflow to process all files");
-  assert.equal(result.useWorkflow, true);
-  assert.ok(result.confidence > 0.5, "result.confidence should be greater than 0.5");
-});
-
-test("shouldUseWorkflow matches workflows keyword", () => {
-  const result = shouldUseWorkflow("use workflows mode");
-  assert.equal(result.useWorkflow, true);
-});
-
-test("shouldUseWorkflow matches parallel keyword", () => {
-  const result = shouldUseWorkflow("run parallel tasks");
-  assert.equal(result.useWorkflow, true);
-});
-
-test("shouldUseWorkflow matches audit keyword", () => {
-  const result = shouldUseWorkflow("audit the codebase");
-  assert.equal(result.useWorkflow, true);
-});
-
-test("shouldUseWorkflow matches migrate keyword", () => {
-  const result = shouldUseWorkflow("migrate all files");
-  assert.equal(result.useWorkflow, true);
-});
-
-test("shouldUseWorkflow matches research keyword", () => {
-  const result = shouldUseWorkflow("research this topic");
-  assert.equal(result.useWorkflow, true);
-});
+// Data-driven keyword trigger tests
+const TRIGGER_CASES = [
+  ["workflow to process all files", "explicit trigger keyword"],
+  ["use workflows mode", "workflows keyword"],
+  ["run parallel tasks", "parallel keyword"],
+  ["audit the codebase", "audit keyword"],
+  ["migrate all files", "migrate keyword"],
+  ["research this topic", "research keyword"],
+  ["bulk update components", "bulk keyword"],
+  ["batch process everything", "batch keyword"],
+  ["sweep the codebase", "sweep keyword"],
+  ["analyze all modules", "'analyze all' pattern"],
+  ["check every endpoint", "'check every' pattern"],
+] as const;
+for (const [input, desc] of TRIGGER_CASES) {
+  test(`shouldUseWorkflow triggers on ${desc}`, () => {
+    assert.equal(shouldUseWorkflow(input).useWorkflow, true, `input: ${input}`);
+  });
+}
 
 test("shouldUseWorkflow triggers on high complexity with many subtask indicators", () => {
   const result = shouldUseWorkflow(
@@ -50,31 +39,6 @@ test("shouldUseWorkflow triggers on high complexity with many subtask indicators
 test("shouldUseWorkflow returns false for simple tasks", () => {
   const result = shouldUseWorkflow("fix typo in file");
   assert.equal(result.useWorkflow, false);
-});
-
-test("shouldUseWorkflow triggers on bulk keyword", () => {
-  const result = shouldUseWorkflow("bulk update components");
-  assert.equal(result.useWorkflow, true);
-});
-
-test("shouldUseWorkflow triggers on batch keyword", () => {
-  const result = shouldUseWorkflow("batch process everything");
-  assert.equal(result.useWorkflow, true);
-});
-
-test("shouldUseWorkflow triggers on 'analyze all' pattern", () => {
-  const result = shouldUseWorkflow("analyze all modules");
-  assert.equal(result.useWorkflow, true);
-});
-
-test("shouldUseWorkflow triggers on 'check every' pattern", () => {
-  const result = shouldUseWorkflow("check every endpoint");
-  assert.equal(result.useWorkflow, true);
-});
-
-test("shouldUseWorkflow triggers on 'sweep' keyword", () => {
-  const result = shouldUseWorkflow("sweep the codebase");
-  assert.equal(result.useWorkflow, true);
 });
 
 test("shouldUseWorkflow returns reason string", () => {

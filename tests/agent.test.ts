@@ -1,8 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { AgentUsage } from "../src/agent.js";
+import type { AgentRunOptions, AgentUsage } from "../src/agent.js";
 import { listAvailableModelSpecs, WorkflowAgent } from "../src/agent.js";
 import { runWorkflow } from "../src/workflow.js";
+
+// Private methods used for testing - cast to this type to access them without `any`
+type WorkflowAgentPrivates = {
+  buildPrompt(prompt: string, options: AgentRunOptions<any>, structured: boolean): string;
+  lastAssistantText(messages: unknown[]): string;
+};
 
 test("listAvailableModelSpecs returns an array (empty when no auth configured)", () => {
   const result = listAvailableModelSpecs();
@@ -74,7 +80,7 @@ test("WorkflowAgent constructor handles all options including mainModel", () => 
 
 test("buildPrompt includes base instructions, task label, and user prompt", () => {
   const agent = new WorkflowAgent({ cwd: "/tmp", instructions: "You are a helper." });
-  const built: string = (agent as any).buildPrompt("analyze this", { label: "analyzer" }, false);
+  const built: string = (agent as unknown as WorkflowAgentPrivates).buildPrompt("analyze this", { label: "analyzer" }, false);
   assert.ok(built.includes("You are a helper."), "should include base instructions");
   assert.ok(built.includes("Task label: analyzer"), "should include task label");
   assert.ok(built.includes("analyze this"), "should include user prompt");
@@ -82,7 +88,7 @@ test("buildPrompt includes base instructions, task label, and user prompt", () =
 
 test("buildPrompt includes per-call instructions when provided", () => {
   const agent = new WorkflowAgent({ cwd: "/tmp", instructions: "Base." });
-  const built: string = (agent as any).buildPrompt("do it", { label: "x", instructions: "Extra." }, false);
+  const built: string = (agent as unknown as WorkflowAgentPrivates).buildPrompt("do it", { label: "x", instructions: "Extra." }, false);
   assert.ok(built.includes("Base."), "base instructions");
   assert.ok(built.includes("Extra."), "per-call instructions");
   assert.ok(built.includes("do it"), "user prompt");
@@ -90,7 +96,7 @@ test("buildPrompt includes per-call instructions when provided", () => {
 
 test("buildPrompt injects structured output contract when schema is used", () => {
   const agent = new WorkflowAgent({ cwd: "/tmp" });
-  const built: string = (agent as any).buildPrompt("return result", { label: "t" }, true);
+  const built: string = (agent as unknown as WorkflowAgentPrivates).buildPrompt("return result", { label: "t" }, true);
   assert.ok(built.includes("structured_output"), "should mention structured_output");
   assert.ok(built.includes("Final output contract:"), "should include contract header");
   assert.ok(built.includes("Do not emit a prose final answer"), "should discourage prose");
@@ -99,14 +105,14 @@ test("buildPrompt injects structured output contract when schema is used", () =>
 
 test("buildPrompt works without base instructions", () => {
   const agent = new WorkflowAgent({ cwd: "/tmp" });
-  const built: string = (agent as any).buildPrompt("hello", { label: "greeter" }, false);
+  const built: string = (agent as unknown as WorkflowAgentPrivates).buildPrompt("hello", { label: "greeter" }, false);
   assert.ok(built.includes("Task label: greeter"), "should contain Task label: greeter");
   assert.ok(built.includes("hello"), "should contain hello");
 });
 
 test("buildPrompt works without label", () => {
   const agent = new WorkflowAgent({ cwd: "/tmp", instructions: "Help." });
-  const built: string = (agent as any).buildPrompt("hello", {}, false);
+  const built: string = (agent as unknown as WorkflowAgentPrivates).buildPrompt("hello", {}, false);
   assert.ok(built.includes("Help."), "should contain Help.");
   assert.ok(built.includes("hello"), "should contain hello");
   assert.ok(!built.includes("Task label:"), "no label when omitted");
@@ -114,7 +120,7 @@ test("buildPrompt works without label", () => {
 
 test("buildPrompt includes both instructions when both base and per-call are set", () => {
   const agent = new WorkflowAgent({ cwd: "/tmp", instructions: "You are a code reviewer." });
-  const built: string = (agent as any).buildPrompt(
+  const built: string = (agent as unknown as WorkflowAgentPrivates).buildPrompt(
     "check this file",
     { label: "reviewer", instructions: "Focus on security." },
     true,
@@ -139,7 +145,7 @@ test("lastAssistantText extracts last assistant text content", () => {
     { role: "user", content: [{ type: "text", text: "hello" }] },
     { role: "assistant", content: [{ type: "text", text: "hi there" }] },
   ];
-  const text: string = (agent as any).lastAssistantText(messages);
+  const text: string = (agent as unknown as WorkflowAgentPrivates).lastAssistantText(messages);
   assert.equal(text, "hi there");
 });
 
@@ -154,7 +160,7 @@ test("lastAssistantText joins multiple text parts", () => {
       ],
     },
   ];
-  const text: string = (agent as any).lastAssistantText(messages);
+  const text: string = (agent as unknown as WorkflowAgentPrivates).lastAssistantText(messages);
   assert.equal(text, "part1part2");
 });
 
@@ -169,20 +175,20 @@ test("lastAssistantText skips non-text content parts", () => {
       ],
     },
   ];
-  const text: string = (agent as any).lastAssistantText(messages);
+  const text: string = (agent as unknown as WorkflowAgentPrivates).lastAssistantText(messages);
   assert.equal(text, "result");
 });
 
 test("lastAssistantText returns empty string when no assistant text", () => {
   const agent = new WorkflowAgent({ cwd: "/tmp" });
-  const text: string = (agent as any).lastAssistantText([]);
+  const text: string = (agent as unknown as WorkflowAgentPrivates).lastAssistantText([]);
   assert.equal(text, "");
 });
 
 test("lastAssistantText returns empty for non-assistant messages", () => {
   const agent = new WorkflowAgent({ cwd: "/tmp" });
   const messages = [{ role: "user", content: [{ type: "text", text: "hello" }] }];
-  const text: string = (agent as any).lastAssistantText(messages);
+  const text: string = (agent as unknown as WorkflowAgentPrivates).lastAssistantText(messages);
   assert.equal(text, "");
 });
 
@@ -193,7 +199,7 @@ test("lastAssistantText picks the last assistant message, not first", () => {
     { role: "user", content: [{ type: "text", text: "more" }] },
     { role: "assistant", content: [{ type: "text", text: "final" }] },
   ];
-  const text: string = (agent as any).lastAssistantText(messages);
+  const text: string = (agent as unknown as WorkflowAgentPrivates).lastAssistantText(messages);
   assert.equal(text, "final");
 });
 
@@ -248,7 +254,7 @@ test("agent() in workflow passes model spec to runner", async () => {
     { agent: rec, persistLogs: false },
   );
   assert.equal(rec.calls.length, 1);
-  assert.equal((rec.calls[0].options as any).model, "fast-llm/model");
+  assert.equal((rec.calls[0].options as { model?: string }).model, "fast-llm/model");
 });
 
 test("agent() in workflow fires onAgentStart and onAgentEnd callbacks", async () => {
@@ -379,7 +385,7 @@ test("agent() with timeout should handle gracefully (timeout returns null)", asy
      return { val }`,
     { agent: slow, persistLogs: false },
   );
-  const r = result.result as any;
+  const r = result.result as { val: unknown };
   // agent() catches timeout internally (recoverable) and returns null
   assert.equal(r.val, null, "timeout agent should return null (recoverable)");
 });

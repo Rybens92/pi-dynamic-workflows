@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { ManagedRun, WorkflowManager } from "../src/workflow-manager.js";
+import type { PersistedRunState } from "../src/run-persistence.js";
+import type { SavedWorkflow } from "../src/workflow-saved.js";
+import type { WorkflowSnapshot } from "../src/display.js";
 import { keyToAction, NavigatorModel, NavigatorState, renderNavigator } from "../src/workflow-ui.js";
 
 /** Fake manager exposing one running run with two phases. */
-function fakeManager() {
-  const snapshot = {
+function fakeManager(): Pick<WorkflowManager, "listRuns" | "getRun"> {
+  const snapshot: WorkflowSnapshot = {
     name: "audit",
     phases: ["Scan", "Report"],
     currentPhase: "Report",
@@ -48,23 +52,24 @@ function fakeManager() {
         agents: snapshot.agents,
         logs: [],
         tokenUsage: snapshot.tokenUsage,
-      },
+      } as unknown as PersistedRunState,
     ],
-    getRun: (id: string) => (id === "run-1" ? { runId: "run-1", status: "running", snapshot } : undefined),
-  } as any;
+    getRun: (id: string) =>
+      id === "run-1" ? ({ runId: "run-1", status: "running", snapshot } as unknown as ManagedRun) : undefined,
+  };
 }
 
-function multiRunManager() {
+function multiRunManager(): Pick<WorkflowManager, "listRuns" | "getRun"> {
   return {
     listRuns: () => [
-      { runId: "r1", workflowName: "a-workflow", status: "running", phases: [], agents: [], logs: [] },
-      { runId: "r2", workflowName: "b-workflow", status: "completed", phases: [], agents: [], logs: [] },
+      { runId: "r1", workflowName: "a-workflow", status: "running", phases: [], agents: [], logs: [] } as unknown as PersistedRunState,
+      { runId: "r2", workflowName: "b-workflow", status: "completed", phases: [], agents: [], logs: [] } as unknown as PersistedRunState,
     ],
     getRun: () => undefined,
-  } as any;
+  };
 }
 
-function persistedRunManager() {
+function persistedRunManager(): Pick<WorkflowManager, "listRuns" | "getRun"> {
   return {
     listRuns: () => [
       {
@@ -74,13 +79,13 @@ function persistedRunManager() {
         phases: ["Build"],
         agents: [{ id: 1, label: "builder", phase: "Build", status: "done", prompt: "build it", result: "ok" }],
         logs: ["done"],
-      },
+      } as unknown as PersistedRunState,
     ],
     getRun: () => undefined,
-  } as any;
+  };
 }
 
-function savedStorage() {
+function savedStorage(): { list(): SavedWorkflow[]; delete(name: string, location?: string): boolean } {
   return {
     list: () => [
       {
@@ -89,16 +94,16 @@ function savedStorage() {
         location: "project",
         path: "/x",
         savedAt: "2025-01-01",
-        script: "export const meta = { name: 'deploy', description: 'Deploy to prod' };",
-      },
+        script: "export const meta = { name: 'deploy', description: 'Deploy to prod' }",
+      } as SavedWorkflow,
       {
         name: "analyze",
         description: "Analyze deps",
         location: "user",
         path: "/y",
         savedAt: "2025-01-02",
-        script: "export const meta = { name: 'analyze', description: 'Analyze deps' };",
-      },
+        script: "export const meta = { name: 'analyze', description: 'Analyze deps' }",
+      } as SavedWorkflow,
       {
         name: "backup",
         description: "Full backup",
@@ -109,11 +114,11 @@ function savedStorage() {
       },
     ],
     delete: () => true,
-  } as any;
+  };
 }
 
-function emptySavedStorage() {
-  return { list: () => [], delete: () => true } as any;
+function emptySavedStorage(): { list(): SavedWorkflow[]; delete(name: string, location?: string): boolean } {
+  return { list: () => [], delete: () => true };
 }
 
 test("NavigatorModel reads runs, phases, agents, and detail", () => {
@@ -221,9 +226,9 @@ test("NavigatorState cursor wraps and detail scroll clamps at 0", () => {
 
 test("NavigatorState drill returns false when nothing to drill into", () => {
   const model = new NavigatorModel({
-    listRuns: () => [],
+    listRuns: () => [] as PersistedRunState[],
     getRun: () => undefined,
-  } as any);
+  });
   const state = new NavigatorState();
   const drilled = state.drill(model);
   assert.equal(drilled, false);
@@ -239,9 +244,9 @@ test("NavigatorState activeRunId returns run at cursor on runs view", () => {
 
 test("NavigatorState activeRunId returns undefined with no runs", () => {
   const model = new NavigatorModel({
-    listRuns: () => [],
+    listRuns: () => [] as PersistedRunState[],
     getRun: () => undefined,
-  } as any);
+  });
   const state = new NavigatorState();
   assert.equal(state.activeRunId(model), undefined);
 });
@@ -294,9 +299,9 @@ test("renderNavigator shows runs view with selected row and footer hint", () => 
 
 test("renderNavigator shows empty hint when no runs", () => {
   const model = new NavigatorModel({
-    listRuns: () => [],
+    listRuns: () => [] as PersistedRunState[],
     getRun: () => undefined,
-  } as any);
+  });
   const state = new NavigatorState();
   const lines = renderNavigator(state, model, 80);
   const text = lines.join("\n");
