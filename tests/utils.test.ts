@@ -1,5 +1,5 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 
 async function loadErrors() {
   return import("../dist/errors.js");
@@ -325,9 +325,7 @@ describe("display", () => {
     const { createWorkflowSnapshot, renderWorkflowLines } = await load();
     const meta = { name: "wf", description: "d" };
     const snap = createWorkflowSnapshot(meta as never);
-    snap.agents = [
-      { id: 1, label: "a1", prompt: "x", status: "done", resultPreview: "found 3 issues" },
-    ] as any;
+    snap.agents = [{ id: 1, label: "a1", prompt: "x", status: "done", resultPreview: "found 3 issues" }] as any;
     const lines = renderWorkflowLines(snap, { showResultPreviews: true });
     const text = lines.join("\n");
     assert.ok(text.includes("found 3 issues"));

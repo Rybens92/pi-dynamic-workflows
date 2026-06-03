@@ -13,14 +13,9 @@
  * workflows-mode trigger fires.
  */
 
-import { describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
-import {
-  hasTrigger,
-  buildForcedWorkflowPrompt,
-  WORKFLOW_TOOL_NAME,
-  type WorkflowModeState,
-} from "../src/workflow-editor.js";
+import { describe, it, mock } from "node:test";
+import { buildForcedWorkflowPrompt, WORKFLOW_TOOL_NAME, type WorkflowModeState } from "../src/workflow-editor.js";
 
 // ---------------------------------------------------------------------------
 // Default Pi tools that every Pi install provides (plugin-independent)
@@ -85,7 +80,7 @@ describe("installWorkflowEditor - tool availability", () => {
     installWorkflowEditor(mockPi as any, ui as any);
 
     // Simulate user submitting a message with "workflow" keyword
-    const inputHandlers = mockPi.handlers["input"];
+    const inputHandlers = mockPi.handlers.input;
     assert.ok(inputHandlers, "input handler should be registered");
     assert.equal(inputHandlers.length, 1);
 
@@ -141,7 +136,7 @@ describe("installWorkflowEditor - tool availability", () => {
     installWorkflowEditor(mockPi as any, ui as any);
 
     // Trigger input with "workflows"
-    const inputHandlers = mockPi.handlers["input"];
+    const inputHandlers = mockPi.handlers.input;
     inputHandlers[0]({
       source: "interactive",
       text: "run workflows",
@@ -154,7 +149,7 @@ describe("installWorkflowEditor - tool availability", () => {
     }
 
     // Simulate turn_end
-    const turnEndHandlers = mockPi.handlers["turn_end"];
+    const turnEndHandlers = mockPi.handlers.turn_end;
     assert.ok(turnEndHandlers, "turn_end handler should be registered");
     assert.equal(turnEndHandlers.length, 1);
 
@@ -177,7 +172,7 @@ describe("installWorkflowEditor - tool availability", () => {
     installWorkflowEditor(mockPi as any, ui as any);
 
     // Simulate user submitting a slash command
-    const inputHandlers = mockPi.handlers["input"];
+    const inputHandlers = mockPi.handlers.input;
     const result = inputHandlers[0]({
       source: "interactive",
       text: "/workflows list",
@@ -201,7 +196,7 @@ describe("installWorkflowEditor - tool availability", () => {
 
     installWorkflowEditor(mockPi as any, ui as any);
 
-    const inputHandlers = mockPi.handlers["input"];
+    const inputHandlers = mockPi.handlers.input;
     const result = inputHandlers[0]({
       source: "api", // non-interactive
       text: "run a workflow",
@@ -222,7 +217,7 @@ describe("installWorkflowEditor - tool availability", () => {
 
     installWorkflowEditor(mockPi as any, ui as any);
 
-    const inputHandlers = mockPi.handlers["input"];
+    const inputHandlers = mockPi.handlers.input;
     const result = inputHandlers[0]({
       source: "interactive",
       text: "",
@@ -245,7 +240,7 @@ describe("installWorkflowEditor - tool availability", () => {
 
     installWorkflowEditor(mockPi as any, ui as any);
 
-    const inputHandlers = mockPi.handlers["input"];
+    const inputHandlers = mockPi.handlers.input;
     assert.doesNotThrow(() => {
       inputHandlers[0]({
         source: "interactive",
@@ -268,7 +263,7 @@ describe("installWorkflowEditor - tool availability", () => {
 
     installWorkflowEditor(mockPi as any, ui as any);
 
-    const inputHandlers = mockPi.handlers["input"];
+    const inputHandlers = mockPi.handlers.input;
     // Should not throw — the catch block handles it
     const result = inputHandlers[0]({
       source: "interactive",
@@ -292,7 +287,7 @@ describe("installWorkflowEditor - tool availability", () => {
     installWorkflowEditor(mockPi as any, ui as any);
 
     // First trigger
-    const inputHandlers = mockPi.handlers["input"];
+    const inputHandlers = mockPi.handlers.input;
     inputHandlers[0]({
       source: "interactive",
       text: "test workflow 1",
@@ -308,7 +303,7 @@ describe("installWorkflowEditor - tool availability", () => {
     assert.equal(mockPi.setActiveTools.mock.callCount(), 1);
 
     // turn_end restores
-    const turnEndHandlers = mockPi.handlers["turn_end"];
+    const turnEndHandlers = mockPi.handlers.turn_end;
     turnEndHandlers[0]();
 
     // Subsequent turn_end should NOT restore again (savedTools is now undefined)
@@ -327,7 +322,7 @@ describe("installWorkflowEditor - tool availability", () => {
 
       mockPi.setActiveTools.mock.resetCalls();
 
-      const inputHandlers = mockPi.handlers["input"];
+      const inputHandlers = mockPi.handlers.input;
       inputHandlers[0]({
         source: "interactive",
         text: `run ${keyword} test`,

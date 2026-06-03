@@ -268,7 +268,8 @@ export function installWorkflowEditor(pi: ExtensionAPI, ui: ExtensionUIContext):
   // the editor, because the editor's state is reset synchronously by submitValue()
   // BEFORE the input event fires (the actual prompt processing is async).
   pi.on("input", (event: { source?: string; text?: string }) => {
-    if (event.source !== "interactive" || !event.text || !hasTrigger(event.text)) return { action: "continue" } as const;
+    if (event.source !== "interactive" || !event.text || !hasTrigger(event.text))
+      return { action: "continue" } as const;
     try {
       if (savedTools === undefined) {
         savedTools = pi.getActiveTools?.() ?? [];

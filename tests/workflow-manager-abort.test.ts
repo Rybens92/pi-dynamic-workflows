@@ -72,7 +72,9 @@ test(
     const da = deferredAgent();
     const manager = new WorkflowManager({ cwd, agent: da.runner });
     let errorEmitted = false;
-    manager.on("error", () => { errorEmitted = true; });
+    manager.on("error", () => {
+      errorEmitted = true;
+    });
 
     const runPromise = manager.runSync(oneAgentScript, undefined, {
       externalSignal: ac.signal,
@@ -114,7 +116,9 @@ test(
     manager.on("error", () => {});
 
     let uncaughtFromTest: Error | null = null;
-    const errorHandler = (err: Error) => { uncaughtFromTest = err; };
+    const errorHandler = (err: Error) => {
+      uncaughtFromTest = err;
+    };
     process.on("uncaughtException", errorHandler);
 
     try {
@@ -134,11 +138,7 @@ test(
       // Give microtasks a chance to settle
       await new Promise((r) => setTimeout(r, 20));
 
-      assert.equal(
-        uncaughtFromTest,
-        null,
-        "abort should NOT produce an uncaught exception",
-      );
+      assert.equal(uncaughtFromTest, null, "abort should NOT produce an uncaught exception");
     } finally {
       process.off("uncaughtException", errorHandler);
     }
@@ -152,11 +152,15 @@ test(
     const resolves: Array<(v: unknown) => void> = [];
     let callIdx = 0;
     const multiDa = {
-      resolve(idx: number, v: unknown = "done") { resolves[idx]?.(v); },
+      resolve(idx: number, v: unknown = "done") {
+        resolves[idx]?.(v);
+      },
       runner: {
         async run(_prompt: string, _options?: { onUsage?: (u: AgentUsage) => void }) {
           const idx = callIdx++;
-          return new Promise((resolve) => { resolves[idx] = resolve; });
+          return new Promise((resolve) => {
+            resolves[idx] = resolve;
+          });
         },
       },
     };
@@ -192,10 +196,7 @@ return { a, b }`;
     // Verify the error is a WorkflowError
     const managedRun = manager.getRun(runId);
     assert.ok(managedRun?.error instanceof WorkflowError);
-    assert.equal(
-      (managedRun.error as WorkflowError).code,
-      WorkflowErrorCode.WORKFLOW_ABORTED,
-    );
+    assert.equal((managedRun.error as WorkflowError).code, WorkflowErrorCode.WORKFLOW_ABORTED);
   }),
 );
 
@@ -233,14 +234,16 @@ test(
     manager.on("error", () => {});
 
     let stoppedEvent: { runId: string } | null = null;
-    manager.on("stopped", (ev: { runId: string }) => { stoppedEvent = ev; });
+    manager.on("stopped", (ev: { runId: string }) => {
+      stoppedEvent = ev;
+    });
 
     const { runId, promise } = manager.startInBackground(oneAgentScript);
     await new Promise((r) => setTimeout(r, 20));
     manager.stop(runId);
 
     assert.ok(stoppedEvent, "stopped event should fire");
-    assert.equal(stoppedEvent!.runId, runId);
+    assert.equal(stoppedEvent?.runId, runId);
 
     da.resolve("done");
     await promise.catch(() => {});
@@ -275,14 +278,16 @@ test(
     manager.on("error", () => {});
 
     let pausedEvent: { runId: string } | null = null;
-    manager.on("paused", (ev: { runId: string }) => { pausedEvent = ev; });
+    manager.on("paused", (ev: { runId: string }) => {
+      pausedEvent = ev;
+    });
 
     const { runId, promise } = manager.startInBackground(oneAgentScript);
     await new Promise((r) => setTimeout(r, 20));
     manager.pause(runId);
 
     assert.ok(pausedEvent, "paused event should fire");
-    assert.equal(pausedEvent!.runId, runId);
+    assert.equal(pausedEvent?.runId, runId);
 
     da.resolve("done");
     await promise.catch(() => {});
@@ -446,16 +451,16 @@ test(
 
     const run = manager.getRun(runId);
     assert.ok(run, "getRun should return the managed run");
-    assert.equal(run!.runId, runId);
-    assert.equal(run!.status, "running");
-    assert.equal(run!.script, oneAgentScript);
-    assert.ok(run!.controller instanceof AbortController, "should have an AbortController");
-    assert.ok(run!.startedAt instanceof Date, "should have a startedAt date");
-    assert.equal(run!.background, true, "should be marked as background");
-    assert.ok(Array.isArray(run!.journal), "should have a journal array");
+    assert.equal(run?.runId, runId);
+    assert.equal(run?.status, "running");
+    assert.equal(run?.script, oneAgentScript);
+    assert.ok(run?.controller instanceof AbortController, "should have an AbortController");
+    assert.ok(run?.startedAt instanceof Date, "should have a startedAt date");
+    assert.equal(run?.background, true, "should be marked as background");
+    assert.ok(Array.isArray(run?.journal), "should have a journal array");
 
     // snapshot should be populated
-    assert.equal(run!.snapshot.name, "tracked_demo");
+    assert.equal(run?.snapshot.name, "tracked_demo");
 
     da.resolve("done");
     await promise.catch(() => {});
@@ -522,7 +527,10 @@ test(
 
     // Should not be in persistence
     const runs = manager.listRuns();
-    assert.equal(runs.find((r) => r.runId === runId), undefined);
+    assert.equal(
+      runs.find((r) => r.runId === runId),
+      undefined,
+    );
 
     da.resolve("done");
     await promise.catch(() => {});
@@ -649,13 +657,15 @@ test(
 test(
   "manager emits 'resumed' and 'error' events",
   withTempCwd(async (cwd) => {
-    const ac = new AbortController();
+    const _ac = new AbortController();
     const da = deferredAgent();
     const manager = new WorkflowManager({ cwd, agent: da.runner });
 
     // Track resumed event
     let resumedEvent: { runId: string } | null = null;
-    manager.on("resumed", (ev: { runId: string }) => { resumedEvent = ev; });
+    manager.on("resumed", (ev: { runId: string }) => {
+      resumedEvent = ev;
+    });
 
     // Track resumed event on the pause→resume cycle
     const { runId, promise: origPromise } = manager.startInBackground(oneAgentScript);
@@ -664,7 +674,7 @@ test(
     await manager.resume(runId);
 
     assert.ok(resumedEvent, "resumed event should fire on resume");
-    assert.equal(resumedEvent!.runId, runId);
+    assert.equal(resumedEvent?.runId, runId);
 
     da.resolve("done");
     await origPromise.catch(() => {});
@@ -673,7 +683,9 @@ test(
     let capturedError: { runId: string; error: WorkflowError } | null = null;
     const da2 = deferredAgent();
     const manager2 = new WorkflowManager({ cwd, agent: da2.runner });
-    manager2.on("error", (ev: { runId: string; error: WorkflowError }) => { capturedError = ev; });
+    manager2.on("error", (ev: { runId: string; error: WorkflowError }) => {
+      capturedError = ev;
+    });
 
     const ac2 = new AbortController();
     const runPromise = manager2.runSync(oneAgentScript, undefined, {
@@ -683,10 +695,14 @@ test(
     ac2.abort();
     da2.resolve("done");
 
-    try { await runPromise; } catch { /* expected */ }
+    try {
+      await runPromise;
+    } catch {
+      /* expected */
+    }
 
     assert.ok(capturedError, "error event should fire on abort");
-    assert.ok(capturedError!.error instanceof WorkflowError);
-    assert.equal(capturedError!.error.code, WorkflowErrorCode.WORKFLOW_ABORTED);
+    assert.ok(capturedError?.error instanceof WorkflowError);
+    assert.equal(capturedError?.error.code, WorkflowErrorCode.WORKFLOW_ABORTED);
   }),
 );

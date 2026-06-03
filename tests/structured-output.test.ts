@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createStructuredOutputTool } from "../src/structured-output.js";
 import { Type } from "typebox";
+import { createStructuredOutputTool } from "../src/structured-output.js";
 
 test("createStructuredOutputTool creates a tool with the given name", () => {
   const capture = { called: false, value: undefined };

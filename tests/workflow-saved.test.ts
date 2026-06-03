@@ -3,8 +3,8 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { createWorkflowStorage, type SavedWorkflow } from "../src/workflow-saved.js";
 import { WORKFLOW_SAVED_DIR } from "../src/config.js";
+import { createWorkflowStorage } from "../src/workflow-saved.js";
 
 /**
  * Run tests with HOME overridden to a temp directory so the user-level

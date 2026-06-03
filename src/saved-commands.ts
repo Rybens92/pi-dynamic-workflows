@@ -5,8 +5,8 @@
 
 import { createCodingTools, type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { runWorkflow, type WorkflowRunResult } from "./workflow.js";
-import type { SavedWorkflow, WorkflowStorage } from "./workflow-saved.js";
 import type { WorkflowManager } from "./workflow-manager.js";
+import type { SavedWorkflow, WorkflowStorage } from "./workflow-saved.js";
 
 function isRegistered(pi: ExtensionAPI, name: string): boolean {
   try {
@@ -47,7 +47,12 @@ export function parseCommandArgs(raw: string, parameters?: SavedWorkflow["parame
  * When a WorkflowManager is provided, the workflow runs through it (visible in
  * /workflows TUI, background execution, task panel). Otherwise falls back to
  * the inline runWorkflow() (foreground, no TUI tracking). */
-export function registerSavedWorkflow(pi: ExtensionAPI, cwd: string, wf: SavedWorkflow, manager?: WorkflowManager): void {
+export function registerSavedWorkflow(
+  pi: ExtensionAPI,
+  cwd: string,
+  wf: SavedWorkflow,
+  manager?: WorkflowManager,
+): void {
   if (isRegistered(pi, wf.name)) return;
   pi.registerCommand(wf.name, {
     description: wf.description || `Saved workflow: ${wf.name}`,
@@ -85,6 +90,11 @@ export function registerSavedWorkflow(pi: ExtensionAPI, cwd: string, wf: SavedWo
 /** Register every saved workflow found in storage.
  * When a WorkflowManager is provided, workflows run through it (visible in
  * /workflows TUI, background execution, task panel). */
-export function registerAllSavedWorkflows(pi: ExtensionAPI, cwd: string, storage: WorkflowStorage, manager?: WorkflowManager): void {
+export function registerAllSavedWorkflows(
+  pi: ExtensionAPI,
+  cwd: string,
+  storage: WorkflowStorage,
+  manager?: WorkflowManager,
+): void {
   for (const wf of storage.list()) registerSavedWorkflow(pi, cwd, wf, manager);
 }

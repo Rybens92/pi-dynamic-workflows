@@ -35,7 +35,10 @@ export function deliverText(run: ManagedRun): string {
           ? result.summary
           : typeof result === "string"
             ? result
-            : result != null ? JSON.stringify(result, null, 2).slice(0, 400) + (JSON.stringify(result, null, 2).length > 400 ? "\n…(truncated)" : "") : "null";
+            : result != null
+              ? JSON.stringify(result, null, 2).slice(0, 400) +
+                (JSON.stringify(result, null, 2).length > 400 ? "\n…(truncated)" : "")
+              : "null";
   const tokens = run.result?.tokenUsage ? ` · ${run.result.tokenUsage.total.toLocaleString()} tokens` : "";
   const agents = run.result?.agentCount ?? run.snapshot.agentCount;
   const duration = run.result?.durationMs ? ` · ${(run.result.durationMs / 1000).toFixed(1)}s` : "";
@@ -71,7 +74,7 @@ export function installResultDelivery(pi: ExtensionAPI, manager: WorkflowManager
 
   const deliver = (content: string) => {
     try {
-      void m.__holder!.pi.sendMessage(
+      void m.__holder?.pi.sendMessage(
         { customType: "workflow-result", content, display: true },
         { triggerTurn: true, deliverAs: "followUp" },
       );

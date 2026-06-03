@@ -26,10 +26,22 @@ function harness(managerOverrides: Record<string, any> = {}) {
     listRuns: () => [],
     getSnapshot: () => null,
     getRun: () => undefined,
-    stop: (id: string) => (calls.push(`stop:${id}`), true),
-    pause: (id: string) => (calls.push(`pause:${id}`), true),
-    resume: async (id: string) => (calls.push(`resume:${id}`), false),
-    deleteRun: (id: string) => (calls.push(`rm:${id}`), true),
+    stop: (id: string) => {
+      calls.push(`stop:${id}`);
+      return true;
+    },
+    pause: (id: string) => {
+      calls.push(`pause:${id}`);
+      return true;
+    },
+    resume: async (id: string) => {
+      calls.push(`resume:${id}`);
+      return false;
+    },
+    deleteRun: (id: string) => {
+      calls.push(`rm:${id}`);
+      return true;
+    },
     ...managerOverrides,
   };
 

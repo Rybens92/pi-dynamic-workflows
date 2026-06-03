@@ -1,14 +1,10 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import {
-  createRunPersistence,
-  generateRunId,
-  type PersistedRunState,
-} from "../src/run-persistence.js";
 import { WORKFLOW_RUNS_DIR } from "../src/config.js";
+import { createRunPersistence, generateRunId, type PersistedRunState } from "../src/run-persistence.js";
 
 function withTempCwd(fn: (cwd: string) => Promise<void>) {
   return async () => {
@@ -55,9 +51,7 @@ test(
       status: "running",
       phases: ["Scan", "Report"],
       currentPhase: "Scan",
-      agents: [
-        { id: 1, label: "agent-1", prompt: "do it", status: "running" },
-      ],
+      agents: [{ id: 1, label: "agent-1", prompt: "do it", status: "running" }],
       logs: ["started", "phase: Scan"],
       startedAt: "2024-01-01T00:00:00.000Z",
       updatedAt: "2024-01-01T00:01:00.000Z",

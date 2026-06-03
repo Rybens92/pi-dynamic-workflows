@@ -36,6 +36,17 @@ export type { WorkflowLogger, WorkflowLoggerOptions } from "./logger.js";
 export { createWorkflowLogger } from "./logger.js";
 export type { ModelRoute, ModelRoutingConfig } from "./model-routing.js";
 export { buildModelRoutingInstructions, parseModelRoutingFromMeta, resolveModelForPhase } from "./model-routing.js";
+export type { ModelTierConfig } from "./model-tier-config.js";
+export {
+  buildDefaultTierConfig,
+  ensureModelTierConfig,
+  formatTierConfig,
+  getModelTierConfigPath,
+  loadModelTierConfig,
+  resolveTierModel,
+  saveModelTierConfig,
+  sortedTierNames,
+} from "./model-tier-config.js";
 export type { PersistedRunState, RunPersistence, RunStatus } from "./run-persistence.js";
 export { createRunPersistence, generateRunId } from "./run-persistence.js";
 export {
@@ -58,18 +69,6 @@ export type {
 } from "./workflow.js";
 export { parseWorkflowScript, runWorkflow } from "./workflow.js";
 export { registerWorkflowCommands } from "./workflow-commands.js";
-export { registerWorkflowModelsCommand } from "./workflows-models-command.js";
-export type { ModelTierConfig } from "./model-tier-config.js";
-export {
-  buildDefaultTierConfig,
-  ensureModelTierConfig,
-  formatTierConfig,
-  getModelTierConfigPath,
-  loadModelTierConfig,
-  resolveTierModel,
-  saveModelTierConfig,
-  sortedTierNames,
-} from "./model-tier-config.js";
 export {
   buildForcedWorkflowPrompt,
   colorizeWorkflow,
@@ -96,5 +95,6 @@ export {
   renderNavigator,
   type ViewKind,
 } from "./workflow-ui.js";
+export { registerWorkflowModelsCommand } from "./workflows-models-command.js";
 export type { Worktree } from "./worktree.js";
 export { createWorktree, removeWorktree } from "./worktree.js";

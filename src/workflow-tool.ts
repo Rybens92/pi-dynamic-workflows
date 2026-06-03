@@ -199,9 +199,8 @@ export function createWorkflowTool(options: WorkflowToolOptions = {}): ToolDefin
           }`
         : "";
 
-      const formattedResult = result.result !== undefined
-        ? `\n\`\`\`json\n${JSON.stringify(result.result, null, 2)}\n\`\`\``
-        : "";
+      const formattedResult =
+        result.result !== undefined ? `\n\`\`\`json\n${JSON.stringify(result.result, null, 2)}\n\`\`\`` : "";
 
       return {
         content: [
@@ -235,7 +234,13 @@ export function createWorkflowTool(options: WorkflowToolOptions = {}): ToolDefin
       // renderer (Text component) shows text literally — so we strip markdown here.
       const text = result.content?.[0];
       const raw = text?.type === "text" ? text.text : theme.fg("muted", "workflow");
-      const clean = raw.replace(/\*\*/g, "").replace(/\*\*(\S)/g, "$1").replace(/```[a-z]*\n/g, "").replace(/```/g, "").replace(/^##+\s*/gm, "").trim();
+      const clean = raw
+        .replace(/\*\*/g, "")
+        .replace(/\*\*(\S)/g, "$1")
+        .replace(/```[a-z]*\n/g, "")
+        .replace(/```/g, "")
+        .replace(/^##+\s*/gm, "")
+        .trim();
       return new Text(clean || theme.fg("muted", "workflow"), 0, 0);
     },
   });

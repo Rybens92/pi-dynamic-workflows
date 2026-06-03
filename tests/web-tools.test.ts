@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createWebSearchTool, createWebFetchTool, createWebTools } from "../src/web-tools.js";
+import { createWebFetchTool, createWebSearchTool, createWebTools } from "../src/web-tools.js";
 
 // ─── createWebSearchTool ─────────────────────────────────────────────────────
 

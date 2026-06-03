@@ -50,7 +50,7 @@ function oneLineProgress(snapshot: WorkflowSnapshot): string {
  */
 function watchRun(manager: WorkflowManager, pi: ExtensionAPI, ctx: ExtensionCommandContext, id: string): boolean {
   const active = manager.getRun(id);
-  if (!active || active.status !== "running") return false;
+  if (active?.status !== "running") return false;
 
   const key = `wf:${id}`;
   const update = () => {

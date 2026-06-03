@@ -1,5 +1,5 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 
 async function load() {
   return import("../dist/saved-commands.js");
@@ -77,7 +77,11 @@ describe("registerSavedWorkflow", () => {
         commands.push({ name, ...spec });
       },
     };
-    const wf = { name: "test-workflow", script: "export const meta = { name: 't', description: 't' };", description: "A test" };
+    const wf = {
+      name: "test-workflow",
+      script: "export const meta = { name: 't', description: 't' };",
+      description: "A test",
+    };
 
     registerSavedWorkflow(pi as never, "/cwd", wf);
     assert.equal(commands.length, 1);
@@ -123,7 +127,7 @@ describe("registerSavedWorkflow", () => {
     const { registerSavedWorkflow } = await load();
     let startedBackground = false;
     const manager = {
-      startInBackground: (script: string, args: unknown) => {
+      startInBackground: (_script: string, _args: unknown) => {
         startedBackground = true;
         return { runId: "test-run", promise: Promise.resolve({ result: { report: "done" } }) };
       },

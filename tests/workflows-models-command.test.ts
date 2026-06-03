@@ -8,11 +8,12 @@
  * editSingleTier now uses ctx.ui.custom() with SelectList.
  * In tests, we mock ctx.ui.custom to directly return the expected value.
  */
-import { describe, it, mock } from "node:test";
+
 import assert from "node:assert/strict";
-import { join } from "node:path";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { describe, it, mock } from "node:test";
 
 async function loadCommand() {
   const mod = await import("../src/workflows-models-command.js");
@@ -41,22 +42,14 @@ describe("workflows-models-command", () => {
       let capturedDescription = "";
 
       const mockPi = {
-        registerCommand: mock.fn(
-          (_name: string, opts: { description?: string }) => {
-            capturedDescription = opts.description ?? "";
-          },
-        ),
+        registerCommand: mock.fn((_name: string, opts: { description?: string }) => {
+          capturedDescription = opts.description ?? "";
+        }),
       };
 
       registerWorkflowModelsCommand(mockPi as never);
-      assert.ok(
-        capturedDescription.length > 0,
-        "description should not be empty",
-      );
-      assert.ok(
-        capturedDescription.toLowerCase().includes("tier"),
-        "description should mention tiers",
-      );
+      assert.ok(capturedDescription.length > 0, "description should not be empty");
+      assert.ok(capturedDescription.toLowerCase().includes("tier"), "description should mention tiers");
     });
   });
 
@@ -131,9 +124,7 @@ describe("workflows-models-command", () => {
 
   describe("integration with model-tier-config", () => {
     it("ensureModelTierConfig creates default on fresh install", async () => {
-      const { ensureModelTierConfig } = await import(
-        "../src/model-tier-config.js"
-      );
+      const { ensureModelTierConfig } = await import("../src/model-tier-config.js");
       const tmpDir = mkdtempSync(join(tmpdir(), "mtc-cmd-test-"));
       const cfgPath = join(tmpDir, "model-tiers.json");
 
@@ -147,9 +138,7 @@ describe("workflows-models-command", () => {
     });
 
     it("save/load round-trip works with single-model config", async () => {
-      const { saveModelTierConfig, loadModelTierConfig } = await import(
-        "../src/model-tier-config.js"
-      );
+      const { saveModelTierConfig, loadModelTierConfig } = await import("../src/model-tier-config.js");
       const tmpDir = mkdtempSync(join(tmpdir(), "mtc-cmd-test-"));
       const cfgPath = join(tmpDir, "model-tiers.json");
 
@@ -164,9 +153,9 @@ describe("workflows-models-command", () => {
       saveModelTierConfig(config, cfgPath);
       const loaded = loadModelTierConfig(cfgPath);
       assert.ok(loaded);
-      assert.equal(loaded!.tiers.small, "gpt-4.1-mini");
-      assert.equal(loaded!.tiers.medium, "gpt-4.1");
-      assert.equal(loaded!.tiers.big, "gpt-5");
+      assert.equal(loaded?.tiers.small, "gpt-4.1-mini");
+      assert.equal(loaded?.tiers.medium, "gpt-4.1");
+      assert.equal(loaded?.tiers.big, "gpt-5");
 
       rmSync(tmpDir, { recursive: true, force: true });
     });

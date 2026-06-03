@@ -120,14 +120,13 @@ test("buildPrompt includes both instructions when both base and per-call are set
     true,
   );
   // Order: base instructions, per-call instructions, label, prompt, structured contract
-  assert.ok(built.indexOf("You are a code reviewer.") < built.indexOf("Focus on security."),
-    "base before per-call");
-  assert.ok(built.indexOf("Focus on security.") < built.indexOf("Task label: reviewer"),
-    "per-call before label");
-  assert.ok(built.indexOf("Task label: reviewer") < built.indexOf("check this file"),
-    "label before prompt");
-  assert.ok(built.indexOf("check this file") < built.indexOf("Final output contract:"),
-    "prompt before structured contract");
+  assert.ok(built.indexOf("You are a code reviewer.") < built.indexOf("Focus on security."), "base before per-call");
+  assert.ok(built.indexOf("Focus on security.") < built.indexOf("Task label: reviewer"), "per-call before label");
+  assert.ok(built.indexOf("Task label: reviewer") < built.indexOf("check this file"), "label before prompt");
+  assert.ok(
+    built.indexOf("check this file") < built.indexOf("Final output contract:"),
+    "prompt before structured contract",
+  );
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -147,10 +146,13 @@ test("lastAssistantText extracts last assistant text content", () => {
 test("lastAssistantText joins multiple text parts", () => {
   const agent = new WorkflowAgent({ cwd: "/tmp" });
   const messages = [
-    { role: "assistant", content: [
-      { type: "text", text: "part1" },
-      { type: "text", text: "part2" },
-    ]},
+    {
+      role: "assistant",
+      content: [
+        { type: "text", text: "part1" },
+        { type: "text", text: "part2" },
+      ],
+    },
   ];
   const text: string = (agent as any).lastAssistantText(messages);
   assert.equal(text, "part1part2");
@@ -159,10 +161,13 @@ test("lastAssistantText joins multiple text parts", () => {
 test("lastAssistantText skips non-text content parts", () => {
   const agent = new WorkflowAgent({ cwd: "/tmp" });
   const messages = [
-    { role: "assistant", content: [
-      { type: "tool_use", id: "t1" },
-      { type: "text", text: "result" },
-    ]},
+    {
+      role: "assistant",
+      content: [
+        { type: "tool_use", id: "t1" },
+        { type: "text", text: "result" },
+      ],
+    },
   ];
   const text: string = (agent as any).lastAssistantText(messages);
   assert.equal(text, "result");
@@ -176,9 +181,7 @@ test("lastAssistantText returns empty string when no assistant text", () => {
 
 test("lastAssistantText returns empty for non-assistant messages", () => {
   const agent = new WorkflowAgent({ cwd: "/tmp" });
-  const messages = [
-    { role: "user", content: [{ type: "text", text: "hello" }] },
-  ];
+  const messages = [{ role: "user", content: [{ type: "text", text: "hello" }] }];
   const text: string = (agent as any).lastAssistantText(messages);
   assert.equal(text, "");
 });
@@ -297,7 +300,9 @@ test("agent() in workflow returns runner result", async () => {
 
 test("agent() in workflow returns null for recoverable errors", async () => {
   const failer = {
-    async run() { throw new Error("recoverable agent error"); },
+    async run() {
+      throw new Error("recoverable agent error");
+    },
   };
   const result = await runWorkflow<unknown>(
     `export const meta = { name: 'test', description: 't' }
@@ -362,7 +367,10 @@ test("agent() accumulates usage across multiple agents", async () => {
 
 test("agent() with timeout should handle gracefully (timeout returns null)", async () => {
   const slow = {
-    async run() { await new Promise(r => setTimeout(r, 20000)); return "slow"; },
+    async run() {
+      await new Promise((r) => setTimeout(r, 20000));
+      return "slow";
+    },
   };
   const result = await runWorkflow<unknown>(
     `export const meta = { name: 'test', description: 't' }
@@ -385,7 +393,7 @@ test("agent() with parallel invokes all agents", async () => {
     { agent: rec, persistLogs: false },
   );
   assert.equal(rec.calls.length, 3);
-  const prompts = rec.calls.map(c => c.prompt).sort();
+  const prompts = rec.calls.map((c) => c.prompt).sort();
   assert.deepEqual(prompts, ["a", "b", "c"]);
 });
 
@@ -436,7 +444,7 @@ test("agent() with structured output schema creates schema tool", async () => {
       return "plain result";
     },
   };
-  const result = await runWorkflow<unknown>(
+  const _result = await runWorkflow<unknown>(
     `export const meta = { name: 'test', description: 't' }
      const r = await agent('return result', { label: 't' })
      return r`,

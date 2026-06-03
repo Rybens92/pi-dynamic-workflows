@@ -11,10 +11,10 @@
  * matters most and is fully covered here.
  */
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { mkdtempSync, rmSync } from "node:fs";
+import { describe, it } from "node:test";
 import {
   buildDefaultTierConfig,
   ensureModelTierConfig,
@@ -68,7 +68,7 @@ describe("tier resolution — fresh install defaults to current model", () => {
     const { loadModelTierConfig } = await import("../src/model-tier-config.js");
     const loaded = loadModelTierConfig(cfgPath);
     assert.ok(loaded, "config should persist to disk");
-    assert.equal(loaded!.tiers.small, "saved/model");
+    assert.equal(loaded?.tiers.small, "saved/model");
 
     rmSync(tmpDir, { recursive: true, force: true });
   });
@@ -121,13 +121,11 @@ describe("tier resolution — get/set/resolve", () => {
     const defaults = buildDefaultTierConfig("roundtrip/model");
     saveModelTierConfig(defaults, cfgPath);
 
-    const { loadModelTierConfig } = await import("../src/model-tier-config.js");
-    const loaded = loadModelTierConfig(cfgPath);
-    assert.ok(loaded);
+    const loaded = ensureModelTierConfig(cfgPath);
 
-    const small = resolveTierModel("small", loaded!);
-    const medium = resolveTierModel("medium", loaded!);
-    const big = resolveTierModel("big", loaded!);
+    const small = resolveTierModel("small", loaded);
+    const medium = resolveTierModel("medium", loaded);
+    const big = resolveTierModel("big", loaded);
     assert.equal(small, "roundtrip/model");
     assert.equal(medium, "roundtrip/model");
     assert.equal(big, "roundtrip/model");

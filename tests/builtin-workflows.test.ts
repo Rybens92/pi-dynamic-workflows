@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { generateAdversarialReviewWorkflow, generateMultiPerspectiveWorkflow } from "../src/adversarial-review.js";
-import { generateDeepResearchWorkflow, generateCodebaseAuditWorkflow } from "../src/deep-research.js";
+import { generateCodebaseAuditWorkflow, generateDeepResearchWorkflow } from "../src/deep-research.js";
 import { createWebTools } from "../src/web-tools.js";
 import { parseWorkflowScript } from "../src/workflow.js";
 
@@ -131,8 +131,5 @@ test("generateMultiPerspectiveWorkflow returns analyses and synthesis", () => {
 
 test("createWebTools exposes web_search and web_fetch", () => {
   const tools = createWebTools();
-  assert.deepEqual(
-    tools.map((t) => t.name).sort(),
-    ["web_fetch", "web_search"],
-  );
+  assert.deepEqual(tools.map((t) => t.name).sort(), ["web_fetch", "web_search"]);
 });

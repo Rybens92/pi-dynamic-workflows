@@ -1,5 +1,5 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 
 // Pure-function tests — import from source (tsx compiles on the fly)
 async function load() {
@@ -43,7 +43,7 @@ describe("hasTrigger", () => {
     assert.equal(hasTrigger("/workflow"), false);
   });
 
-  it('returns false for unrelated text', async () => {
+  it("returns false for unrelated text", async () => {
     const { hasTrigger } = await load();
     assert.equal(hasTrigger("hello world"), false);
   });
@@ -58,7 +58,7 @@ describe("hasTrigger", () => {
     assert.equal(hasTrigger("working flow"), false);
   });
 
-  it('works with non-ASCII characters around the trigger', async () => {
+  it("works with non-ASCII characters around the trigger", async () => {
     const { hasTrigger } = await load();
     assert.equal(hasTrigger("zrób workflow test"), true);
     assert.equal(hasTrigger("uruchom workflows"), true);
@@ -76,7 +76,7 @@ describe("endsWithTrigger", () => {
     assert.equal(endsWithTrigger("see workflows"), true);
   });
 
-  it('returns false when trigger is not at end', async () => {
+  it("returns false when trigger is not at end", async () => {
     const { endsWithTrigger } = await load();
     assert.equal(endsWithTrigger("workflow test"), false);
   });
@@ -199,7 +199,7 @@ describe("buildForcedWorkflowPrompt", () => {
   it("includes the directive", async () => {
     const { buildForcedWorkflowPrompt } = await load();
     const result = buildForcedWorkflowPrompt("test");
-    assert.ok(result.includes('tool named exactly \`workflow\`'));
+    assert.ok(result.includes("tool named exactly `workflow`"));
     assert.ok(result.includes("MUST"));
   });
 

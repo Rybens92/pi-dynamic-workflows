@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { AgentUsage } from "../src/agent.js";
-import { type JournalEntry, parseWorkflowScript, runWorkflow } from "../src/workflow.js";
+import { type JournalEntry, runWorkflow } from "../src/workflow.js";
 
 /** Agent runner that counts real invocations and echoes a per-call result. */
 function countingAgent() {
@@ -310,7 +310,9 @@ return { a, b }`;
     agent: countingAgent().runner,
     persistLogs: false,
     onPhase: (title) => phases.push(title),
-    onAgentStart: (e) => { if (e.phase) agentPhases.push(e.phase); },
+    onAgentStart: (e) => {
+      if (e.phase) agentPhases.push(e.phase);
+    },
   });
 
   assert.ok(phases.includes("Phase1"));

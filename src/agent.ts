@@ -12,8 +12,8 @@ import {
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import type { Static, TSchema } from "typebox";
+import { loadModelTierConfig, resolveTierModel } from "./model-tier-config.js";
 import { createStructuredOutputTool, type StructuredOutputCapture } from "./structured-output.js";
-import { resolveTierModel, loadModelTierConfig } from "./model-tier-config.js";
 
 export interface WorkflowAgentOptions {
   cwd?: string;

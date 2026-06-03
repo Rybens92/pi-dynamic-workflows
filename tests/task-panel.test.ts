@@ -1,6 +1,6 @@
-import { describe, it, mock, before } from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
+import { before, describe, it } from "node:test";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 type TaskPanelModule = {

@@ -18,14 +18,13 @@ test("registerBuiltinWorkflows registers deep-research and adversarial-review co
 });
 
 test("registerBuiltinWorkflows is idempotent — skips already registered commands", () => {
-  const commands: Array<{ name: string }> = [
-    { name: "deep-research" },
-    { name: "adversarial-review" },
-  ];
+  const commands: Array<{ name: string }> = [{ name: "deep-research" }, { name: "adversarial-review" }];
   let registerCount = 0;
   const pi: any = {
     getCommands: () => commands,
-    registerCommand: () => { registerCount++; },
+    registerCommand: () => {
+      registerCount++;
+    },
   };
 
   registerBuiltinWorkflows(pi, { cwd: "/tmp" });
@@ -37,7 +36,9 @@ test("registerBuiltinWorkflows registers only missing commands", () => {
   const registered: string[] = [];
   const pi: any = {
     getCommands: () => commands,
-    registerCommand: (name: string) => { registered.push(name); },
+    registerCommand: (name: string) => {
+      registered.push(name);
+    },
   };
 
   registerBuiltinWorkflows(pi, { cwd: "/tmp" });

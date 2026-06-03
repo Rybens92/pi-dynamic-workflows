@@ -241,7 +241,7 @@ export class NavigatorState {
   }
 
   /** Live cursor position within the current view's items. */
-  itemCursor(model: NavigatorModel): number {
+  itemCursor(_model: NavigatorModel): number {
     if (this.kind === "runs") return this.cursor;
     return this.top().cursor;
   }
@@ -540,7 +540,7 @@ export function openWorkflowNavigator(
   const state = new NavigatorState();
 
   return ui.custom<void>(
-    (tui: TUI, theme: Theme, _keybindings, done: (r: void) => void) => {
+    (tui: TUI, theme: Theme, _keybindings, done: (r: undefined) => void) => {
       const rerender = () => tui.requestRender();
       const events = ["agentStart", "agentEnd", "phase", "log", "complete", "error", "stopped", "paused", "resumed"];
       const onEvent = () => rerender();
@@ -562,12 +562,12 @@ export function openWorkflowNavigator(
           case "back":
             if (!state.back()) {
               cleanup();
-              done();
+              done(undefined);
             }
             break;
           case "close":
             cleanup();
-            done();
+            done(undefined);
             return;
           case "deleteSaved": {
             if (state.kind === "runs") {

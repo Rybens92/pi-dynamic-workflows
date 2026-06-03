@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { backgroundStartedText, createWorkflowTool, modelRoutingGuideline } from "../src/workflow-tool.js";
-import { parseWorkflowScript } from "../src/workflow.js";
 
 // ─── backgroundStartedText ─────────────────────────────────────────────────────
 
@@ -95,34 +94,24 @@ test("modelRoutingGuideline includes available models list", () => {
   const text = modelRoutingGuideline();
   assert.ok(text.includes("available models"), "should mention available models");
   // Should reference the list of models, even if empty
-  assert.ok(text.includes("route only to these") || text.includes("available models"),
-    "should explain which models are in scope");
+  assert.ok(
+    text.includes("route only to these") || text.includes("available models"),
+    "should explain which models are in scope",
+  );
 });
 
 test("modelRoutingGuideline explains when to use each option", () => {
   const text = modelRoutingGuideline();
-  assert.ok(
-    /small.*(exploration|search|inventory|agents)/i.test(text),
-    "small tier should mention light workloads",
-  );
-  assert.ok(
-    /big.*(synthesis|judgment|decision)/i.test(text),
-    "big tier should mention heavy reasoning",
-  );
+  assert.ok(/small.*(exploration|search|inventory|agents)/i.test(text), "small tier should mention light workloads");
+  assert.ok(/big.*(synthesis|judgment|decision)/i.test(text), "big tier should mention heavy reasoning");
 });
 
 test("createWorkflowTool invalid args throws descriptive error", () => {
   const tool = createWorkflowTool();
   // We can test prepareArguments through the tool definition
   if (tool.prepareArguments) {
-    assert.throws(
-      () => (tool.prepareArguments as Function)({ script: 123 }),
-      /script.*string/,
-    );
-    assert.throws(
-      () => (tool.prepareArguments as Function)("not-an-object"),
-      /object argument/,
-    );
+    assert.throws(() => (tool.prepareArguments as Function)({ script: 123 }), /script.*string/);
+    assert.throws(() => (tool.prepareArguments as Function)("not-an-object"), /object argument/);
   }
 });
 

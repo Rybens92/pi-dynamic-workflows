@@ -1,17 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  resolveModelForPhase,
   buildModelRoutingInstructions,
-  parseModelRoutingFromMeta,
   type ModelRoutingConfig,
+  parseModelRoutingFromMeta,
+  resolveModelForPhase,
 } from "../src/model-routing.js";
 
 test("resolveModelForPhase returns default when no phases match", () => {
-  assert.equal(
-    resolveModelForPhase("Discovery", { defaultModel: "default-model", routes: [] }),
-    "default-model",
-  );
+  assert.equal(resolveModelForPhase("Discovery", { defaultModel: "default-model", routes: [] }), "default-model");
 });
 
 test("resolveModelForPhase returns undefined when no default and no routes", () => {

@@ -19,7 +19,7 @@ import {
   type SelectListTheme,
   Spacer,
   Text,
-  TUI,
+  type TUI,
 } from "@earendil-works/pi-tui";
 import { listAvailableModelSpecs } from "./agent.js";
 import {
@@ -124,60 +124,50 @@ export async function editSingleTier(
   // Build SelectItems: all available models as scrollable list
   const items: SelectItem[] = available.map((m) => ({ value: m, label: m }));
 
-  const result = await ctx.ui.custom<string | null>(
-    (tui: TUI, theme: Theme, _keybindings, done) => {
-      const container = new Container();
+  const result = await ctx.ui.custom<string | null>((tui: TUI, theme: Theme, _keybindings, done) => {
+    const container = new Container();
 
-      // Title showing current model
-      const titleText = current
-        ? `Pick a model for "${tierName}" (current: ${current})`
-        : `Pick a model for "${tierName}"`;
-      container.addChild(new Text(theme.fg("accent", titleText), 1, 0));
-      container.addChild(new Spacer(1));
+    // Title showing current model
+    const titleText = current
+      ? `Pick a model for "${tierName}" (current: ${current})`
+      : `Pick a model for "${tierName}"`;
+    container.addChild(new Text(theme.fg("accent", titleText), 1, 0));
+    container.addChild(new Spacer(1));
 
-      // SelectList theme
-      const selectTheme: SelectListTheme = {
-        selectedPrefix: (t: string) =>
-          theme.bg("selectedBg", theme.fg("accent", t)),
-        selectedText: (t: string) =>
-          theme.bg("selectedBg", theme.bold(t)),
-        description: (t: string) => theme.fg("muted", t),
-        scrollInfo: (t: string) => theme.fg("dim", t),
-        noMatch: (t: string) => theme.fg("warning", t),
-      };
+    // SelectList theme
+    const selectTheme: SelectListTheme = {
+      selectedPrefix: (t: string) => theme.bg("selectedBg", theme.fg("accent", t)),
+      selectedText: (t: string) => theme.bg("selectedBg", theme.bold(t)),
+      description: (t: string) => theme.fg("muted", t),
+      scrollInfo: (t: string) => theme.fg("dim", t),
+      noMatch: (t: string) => theme.fg("warning", t),
+    };
 
-      const selectList = new SelectList(items, 12, selectTheme);
+    const selectList = new SelectList(items, 12, selectTheme);
 
-      // Preselect the current model
-      if (current) {
-        const idx = items.findIndex((i) => i.value === current);
-        if (idx >= 0) selectList.setSelectedIndex(idx);
-      }
+    // Preselect the current model
+    if (current) {
+      const idx = items.findIndex((i) => i.value === current);
+      if (idx >= 0) selectList.setSelectedIndex(idx);
+    }
 
-      // Wire up callbacks
-      selectList.onSelect = (item) => done(item.value);
-      selectList.onCancel = () => done(null);
+    // Wire up callbacks
+    selectList.onSelect = (item) => done(item.value);
+    selectList.onCancel = () => done(null);
 
-      container.addChild(selectList);
-      container.addChild(new Spacer(1));
-      container.addChild(
-        new Text(
-          theme.fg("dim", "↑↓ navigate  enter select  esc cancel"),
-          1,
-          0,
-        ),
-      );
+    container.addChild(selectList);
+    container.addChild(new Spacer(1));
+    container.addChild(new Text(theme.fg("dim", "↑↓ navigate  enter select  esc cancel"), 1, 0));
 
-      return {
-        render: (w: number) => container.render(w),
-        invalidate: () => container.invalidate(),
-        handleInput: (data: string) => {
-          selectList.handleInput(data);
-          tui.requestRender();
-        },
-      };
-    },
-  );
+    return {
+      render: (w: number) => container.render(w),
+      invalidate: () => container.invalidate(),
+      handleInput: (data: string) => {
+        selectList.handleInput(data);
+        tui.requestRender();
+      },
+    };
+  });
 
   if (!result || result === current) return null;
 

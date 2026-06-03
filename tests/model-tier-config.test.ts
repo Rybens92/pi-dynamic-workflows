@@ -11,11 +11,12 @@
  *
  * All tier configs are single-model-per-tier (Record<string, string>).
  */
-import { describe, it, mock } from "node:test";
+
 import assert from "node:assert/strict";
-import { join } from "node:path";
-import { mkdtempSync, writeFileSync, rmSync, existsSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { describe, it } from "node:test";
 
 /**
  * Available model specs used by classification tests.
@@ -54,11 +55,7 @@ describe("model-tier-config", () => {
       const { buildDefaultTierConfig } = await loadModule();
       const cfg = buildDefaultTierConfig();
       for (const [name, model] of Object.entries(cfg.tiers)) {
-        assert.equal(
-          typeof model,
-          "string",
-          `${name} tier should hold a string, got ${typeof model}`,
-        );
+        assert.equal(typeof model, "string", `${name} tier should hold a string, got ${typeof model}`);
         assert.ok(model.length > 0, `${name} tier model should not be empty`);
       }
     });
@@ -70,8 +67,7 @@ describe("model-tier-config", () => {
         const lower = cfg.tiers.small.toLowerCase();
         const id = lower.includes("/") ? lower.split("/").pop()! : lower;
         assert.ok(
-          /mini|flash|haiku|nano|lite|fast|small\b/.test(id) &&
-            !/(deep-research|pro)/.test(id),
+          /mini|flash|haiku|nano|lite|fast|small\b/.test(id) && !/(deep-research|pro)/.test(id),
           `${cfg.tiers.small} should be classified as small`,
         );
       }
@@ -230,9 +226,9 @@ describe("model-tier-config", () => {
       saveModelTierConfig(config, cfgPath);
       const loaded = loadModelTierConfig(cfgPath);
       assert.ok(loaded);
-      assert.equal(loaded!.tiers.small, "gpt-4.1-mini", "single-model string");
-      assert.equal(loaded!.tiers.medium, "gpt-4.1", "single-model string");
-      assert.equal(loaded!.tiers.big, "gpt-5", "single-model string");
+      assert.equal(loaded?.tiers.small, "gpt-4.1-mini", "single-model string");
+      assert.equal(loaded?.tiers.medium, "gpt-4.1", "single-model string");
+      assert.equal(loaded?.tiers.big, "gpt-5", "single-model string");
       rmSync(tmpDir, { recursive: true, force: true });
     });
 
@@ -283,7 +279,7 @@ describe("model-tier-config", () => {
       writeFileSync(cfgPath, '{"tiers": {"small": "gpt-4.1-mini"}}', "utf-8");
       const result = loadModelTierConfig(cfgPath);
       assert.ok(result, "string values should be accepted");
-      assert.equal(result!.tiers.small, "gpt-4.1-mini");
+      assert.equal(result?.tiers.small, "gpt-4.1-mini");
       rmSync(tmpDir, { recursive: true, force: true });
     });
   });
@@ -334,11 +330,7 @@ describe("model-tier-config", () => {
       for (const line of lines) {
         if (line.startsWith("  ")) {
           const parts = line.split(": ");
-          assert.equal(
-            parts.length,
-            2,
-            `line should have one value after colon: ${line}`,
-          );
+          assert.equal(parts.length, 2, `line should have one value after colon: ${line}`);
         }
       }
     });
@@ -368,22 +360,13 @@ describe("model-tier-config", () => {
     it("classifies flash variants as small", async () => {
       const { classifyModelSpec } = await loadModule();
       assert.equal(classifyModelSpec("openai/gpt-4.1-nano"), "small");
-      assert.equal(
-        classifyModelSpec("openrouter/google/gemini-2.0-flash-001"),
-        "small",
-      );
-      assert.equal(
-        classifyModelSpec("openrouter/deepseek/deepseek-v4-flash"),
-        "small",
-      );
+      assert.equal(classifyModelSpec("openrouter/google/gemini-2.0-flash-001"), "small");
+      assert.equal(classifyModelSpec("openrouter/deepseek/deepseek-v4-flash"), "small");
     });
 
     it("classifies haiku variants as small", async () => {
       const { classifyModelSpec } = await loadModule();
-      assert.equal(
-        classifyModelSpec("openrouter/anthropic/claude-haiku-4.5"),
-        "small",
-      );
+      assert.equal(classifyModelSpec("openrouter/anthropic/claude-haiku-4.5"), "small");
     });
 
     it("classifies lite variants as small", async () => {
@@ -394,27 +377,15 @@ describe("model-tier-config", () => {
     it("classifies medium-range models as medium", async () => {
       const { classifyModelSpec } = await loadModule();
       assert.equal(classifyModelSpec("openai/gpt-4.1"), "medium");
-      assert.equal(
-        classifyModelSpec("openrouter/anthropic/claude-sonnet-4"),
-        "medium",
-      );
+      assert.equal(classifyModelSpec("openrouter/anthropic/claude-sonnet-4"), "medium");
     });
 
     it("classifies top reasoning models as big", async () => {
       const { classifyModelSpec } = await loadModule();
       assert.equal(classifyModelSpec("openai/gpt-5"), "big");
-      assert.equal(
-        classifyModelSpec("openrouter/anthropic/claude-opus-4"),
-        "big",
-      );
-      assert.equal(
-        classifyModelSpec("openrouter/google/gemini-2.5-pro"),
-        "big",
-      );
-      assert.equal(
-        classifyModelSpec("openrouter/deepseek/deepseek-v4-pro"),
-        "big",
-      );
+      assert.equal(classifyModelSpec("openrouter/anthropic/claude-opus-4"), "big");
+      assert.equal(classifyModelSpec("openrouter/google/gemini-2.5-pro"), "big");
+      assert.equal(classifyModelSpec("openrouter/deepseek/deepseek-v4-pro"), "big");
     });
 
     it("classifies o-series models as big", async () => {
@@ -439,10 +410,7 @@ describe("model-tier-config", () => {
       const result = classifyModelsToTiers(FAKE_AVAILABLE);
       const allClassified = Object.values(result).flat();
       for (const m of FAKE_AVAILABLE) {
-        assert.ok(
-          allClassified.includes(m),
-          `${m} should be classified into a tier`,
-        );
+        assert.ok(allClassified.includes(m), `${m} should be classified into a tier`);
       }
     });
 
@@ -451,11 +419,7 @@ describe("model-tier-config", () => {
       const result = classifyModelsToTiers(FAKE_AVAILABLE);
       const all: string[] = Object.values(result).flat();
       const unique = new Set(all);
-      assert.equal(
-        all.length,
-        unique.size,
-        "no model should appear in multiple tiers",
-      );
+      assert.equal(all.length, unique.size, "no model should appear in multiple tiers");
     });
 
     it("classifies models consistently with classifyModelSpec", async () => {
@@ -463,11 +427,7 @@ describe("model-tier-config", () => {
       const result = classifyModelsToTiers(FAKE_AVAILABLE);
       for (const [tier, models] of Object.entries(result)) {
         for (const m of models) {
-          assert.equal(
-            classifyModelSpec(m),
-            tier,
-            `${m} should be classified as ${tier} by both functions`,
-          );
+          assert.equal(classifyModelSpec(m), tier, `${m} should be classified as ${tier} by both functions`);
         }
       }
     });
