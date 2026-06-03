@@ -116,16 +116,34 @@ export function classifyModelsToTiers(availableModels: string[]): Record<string,
 // ---------------------------------------------------------------------------
 
 /**
- * Build a sensible default tier config based on the user's currently
- * available models. Models are classified by heuristic:
- * - "small":   mini/flash/lite/haiku/nano variants of the SAME provider
+ * Build a sensible default tier config.
+ *
+ * When `currentModelSpec` is provided (fresh install or reset to defaults),
+ * all tiers are set to the user's currently active Pi model.
+ * This ensures a new user sees consistent behavior: every subagent
+ * tier defaults to the model they're already chatting with.
+ *
+ * Without `currentModelSpec` (legacy fallback), uses heuristic
+ * classification from available models:
+ * - "small":   mini/flash/lite/haiku/nano
  * - "medium":  mid-range (gpt-4.1, claude-sonnet, gemini-pro)
- * - "big":     top-tier (gpt-5/claude-opus/gemini-pro-2.5 thinking)
+ * - "big":     top-tier (gpt-5/claude-opus/o1/o3)
  *
  * For each tier, the first classified model is selected. If a tier ends
  * up empty, the first model available overall is used as fallback.
  */
-export function buildDefaultTierConfig(): ModelTierConfig {
+export function buildDefaultTierConfig(currentModelSpec?: string): ModelTierConfig {
+  if (currentModelSpec) {
+    // Fresh install / reset: all tiers = user's current Pi model
+    return {
+      tiers: {
+        small: currentModelSpec,
+        medium: currentModelSpec,
+        big: currentModelSpec,
+      },
+    };
+  }
+
   const available = listAvailableModelSpecs();
   const classified = classifyModelsToTiers(available);
   const firstOverall = available[0];
@@ -186,14 +204,18 @@ export function saveModelTierConfig(config: ModelTierConfig, configPath?: string
  * Loads the config from disk. If no valid config is found (fresh install
  * or corrupt file), builds a default config, persists it, and returns it.
  *
+ * When `currentModelSpec` is provided (fresh install), all tiers default
+ * to the user's currently active Pi model.
+ *
  * @param configPath - Optional override path for the config file.
+ * @param currentModelSpec - Optional model spec for fresh-install defaults.
  * @returns A valid {@link ModelTierConfig}.
  */
-export function ensureModelTierConfig(configPath?: string): ModelTierConfig {
+export function ensureModelTierConfig(configPath?: string, currentModelSpec?: string): ModelTierConfig {
   const existing = loadModelTierConfig(configPath);
   if (existing) return existing;
 
-  const defaults = buildDefaultTierConfig();
+  const defaults = buildDefaultTierConfig(currentModelSpec);
   saveModelTierConfig(defaults, configPath);
   return defaults;
 }

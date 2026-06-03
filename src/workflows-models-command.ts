@@ -39,7 +39,9 @@ export function registerWorkflowModelsCommand(pi: ExtensionAPI): void {
       await ctx.waitForIdle();
 
       // ensureModelTierConfig handles "fresh install" — creates default config if none exists
-      let config = ensureModelTierConfig();
+      // On fresh install, all tiers default to the user's currently active Pi model.
+      const currentModel = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined;
+      let config = ensureModelTierConfig(undefined, currentModel);
       let dirty = false;
 
       const ensureFresh = (cfg: typeof config) => {
@@ -83,7 +85,7 @@ export function registerWorkflowModelsCommand(pi: ExtensionAPI): void {
             "This will replace current configuration with auto-classified defaults. Continue?",
           );
           if (confirmed) {
-            ensureFresh(buildDefaultTierConfig());
+            ensureFresh(buildDefaultTierConfig(currentModel));
             ctx.ui.notify("Tiers reset to defaults. Use 'Save and exit' to persist.", "info");
           }
         }
