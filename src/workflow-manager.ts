@@ -332,7 +332,10 @@ export class WorkflowManager extends EventEmitter {
       durationMs: managed.result?.durationMs,
     });
     } catch (err) {
-      // Silently handle persistence failures — the run is still healthy in memory.
+      // Persistence is best-effort: the run is still healthy in memory.
+      // Log so an operator debugging state-loss has a lead, but never crash
+      // the workflow over a disk-full situation.
+      console.warn("[workflow-manager] Persist run failed:", err);
     }
   }
 
