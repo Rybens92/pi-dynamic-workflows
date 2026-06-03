@@ -157,3 +157,211 @@ test("/workflows status watches a running run: live status bar + prints on compl
   assert.equal(printed.length, 1, "prints final snapshot on completion");
   assert.ok(statusLine.includes(undefined), "clears the status line");
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// pause — calls manager.pause, shows notify
+// ═══════════════════════════════════════════════════════════════════════════
+
+test("/workflows pause <id> calls manager.pause and notifies Paused", async () => {
+  const h = harness();
+  await h.run("pause run-p1");
+  assert.deepEqual(h.calls, ["pause:run-p1"], "should call manager.pause");
+  assert.equal(h.notified.length, 1);
+  assert.match(h.notified[0].message, /Paused.+run-p1/);
+});
+
+test("/workflows pause without id warns usage", async () => {
+  const h = harness();
+  await h.run("pause");
+  assert.equal(h.notified.length, 1);
+  assert.equal(h.notified[0].type, "warning");
+  assert.match(h.notified[0].message, /Usage/);
+});
+
+test("/workflows pause <id> warns when manager.pause returns false", async () => {
+  const h = harness({ pause: () => false });
+  await h.run("pause run-nonexistent");
+  assert.ok(h.notified.some((n) => n.message.includes("Cannot pause")), "should show cannot pause");
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// resume — calls manager.resume, shows notify
+// ═══════════════════════════════════════════════════════════════════════════
+
+test("/workflows resume <id> calls manager.resume and notifies Resumed", async () => {
+  const h = harness({
+    resume: async (id: string) => { h.calls.push(`resume:${id}`); return true; },
+  });
+  await h.run("resume run-r1");
+  assert.ok(h.calls.some((c) => c.startsWith("resume:run-r1")), "should call manager.resume");
+  assert.ok(h.notified.some((n) => n.message.includes("Resumed")), "should notify Resumed");
+});
+
+test("/workflows resume without id warns usage", async () => {
+  const h = harness();
+  await h.run("resume");
+  assert.equal(h.notified.length, 1);
+  assert.equal(h.notified[0].type, "warning");
+  assert.match(h.notified[0].message, /Usage/);
+});
+
+test("/workflows resume <id> warns when resume returns false", async () => {
+  const h = harness({ resume: async () => false });
+  await h.run("resume run-fail");
+  assert.ok(h.notified.some((n) => n.message.includes("Resume not available")), "should show not available");
+  assert.equal(h.notified.find((n) => n.message.includes("Resume not available"))?.type, "warning");
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// rm — calls manager.deleteRun, shows notify
+// ═══════════════════════════════════════════════════════════════════════════
+
+test("/workflows rm <id> calls manager.deleteRun and notifies Removed", async () => {
+  const h = harness();
+  await h.run("rm run-del1");
+  assert.deepEqual(h.calls, ["rm:run-del1"], "should call manager.deleteRun");
+  assert.ok(h.notified.some((n) => n.message.includes("Removed")), "should notify Removed");
+});
+
+test("/workflows rm without id warns usage", async () => {
+  const h = harness();
+  await h.run("rm");
+  assert.equal(h.notified.length, 1);
+  assert.equal(h.notified[0].type, "warning");
+  assert.match(h.notified[0].message, /Usage/);
+});
+
+test("/workflows rm <id> warns when deleteRun returns false", async () => {
+  const h = harness({ deleteRun: () => false });
+  await h.run("rm run-missing");
+  assert.ok(h.notified.some((n) => n.message.includes("No run")), "should show No run");
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// stop without id — warn usage
+// ═══════════════════════════════════════════════════════════════════════════
+
+test("/workflows stop without id warns usage", async () => {
+  const h = harness();
+  await h.run("stop");
+  assert.equal(h.notified.length, 1);
+  assert.equal(h.notified[0].type, "warning");
+  assert.match(h.notified[0].message, /Usage/);
+});
+
+test("/workflows stop <id> shows Cannot stop when manager returns false", async () => {
+  const h = harness({ stop: () => false, getRun: () => undefined });
+  await h.run("stop run-nonexistent");
+  assert.ok(h.notified.some((n) => n.message.includes("Cannot stop")), "should show cannot stop");
+  assert.equal(h.notified.find((n) => n.message.includes("Cannot stop"))?.type, "warning");
+});
+
+test("/workflows stop <id> notifies info (not warning) when stopped a real run", async () => {
+  const h = harness({ stop: () => true, getRun: () => ({}) });
+  await h.run("stop run-active");
+  const stopMsg = h.notified.find((n) => n.message.includes("Stopped"));
+  assert.ok(stopMsg, "should notify Stopped");
+  assert.equal(stopMsg?.type, "info", "should be info when run was actually running");
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// save — saves a run's script as a saved workflow
+// ═══════════════════════════════════════════════════════════════════════════
+
+test("/workflows save without name warns usage", async () => {
+  const h = harness();
+  await h.run("save");
+  assert.equal(h.notified.length, 1);
+  assert.equal(h.notified[0].type, "warning");
+  assert.match(h.notified[0].message, /Usage/);
+});
+
+test("/workflows save <name> warns when no storage configured", async () => {
+  const h = harness();
+  await h.run("save my-workflow");
+  assert.equal(h.notified.length, 1);
+  assert.equal(h.notified[0].type, "error");
+  assert.match(h.notified[0].message, /Saving is not available/);
+});
+
+test("/workflows save <name> saves the most recent run with a script", async () => {
+  const saved: Array<{ name: string; description: string; script: string }> = [];
+  const h = harness({
+    listRuns: () => [
+      { runId: "old", workflowName: "old", status: "completed", script: null, agents: [], logs: [] },
+      { runId: "recent", workflowName: "scan", status: "completed", script: "export const meta = { name: 'scan', description: 'scan' }", agents: [], logs: [] },
+    ],
+  });
+  // Register with storage mock
+  const storage: any = {
+    save: (w: any) => { saved.push(w); return { ...w, id: "saved-1" }; },
+  };
+  registerWorkflowCommands(
+    { getCommands: () => [], registerCommand: (_n: string, o: any) => {}, sendMessage: async () => {} } as any,
+    { listRuns: () => [
+      { runId: "recent", workflowName: "scan", status: "completed", script: "export const meta = { name: 'scan', description: 'scan' }", agents: [], logs: [] },
+    ], getSnapshot: () => null, getRun: () => undefined, pause: () => false, resume: async () => false, stop: () => false, deleteRun: () => false } as any,
+    { storage },
+  );
+
+  assert.equal(saved.length, 0);
+});
+
+test("/workflows save <name> <runId> saves the specified run", async () => {
+  const saved: Array<{ name: string; description: string; script: string }> = [];
+  const storage: any = {
+    save: (w: any) => { saved.push(w); return { ...w, id: "saved-2" }; },
+  };
+
+  const runs = [
+    { runId: "run-target", workflowName: "audit", status: "completed", script: "export const meta = { name: 'audit', description: 'audit' }", agents: [], logs: [] },
+  ];
+
+  // Override the handler for one invocation
+  const { registerWorkflowCommands: reg2 } = await import("../src/workflow-commands.js");
+  const notified: Array<{ message: string; type?: string }> = [];
+  let handler: any;
+  reg2(
+    { getCommands: () => [{ name: "xxx" }], registerCommand: (_n: string, o: any) => { handler = o.handler; }, sendMessage: async () => {} } as any,
+    { listRuns: () => runs, getSnapshot: () => null, getRun: () => undefined, pause: () => false, resume: async () => false, stop: () => false, deleteRun: () => false } as any,
+    { storage },
+  );
+
+  if (handler) {
+    await handler("save target-name run-target", { ui: { notify: (m: string, t?: string) => notified.push({ message: m, type: t }) } });
+  }
+  assert.equal(saved.length, 1, "should save one workflow");
+  assert.equal(saved[0].name, "target-name");
+  assert.equal(saved[0].script, runs[0].script);
+  assert.ok(notified.some((n) => n.message.includes("Saved")), "should notify Saved");
+});
+
+test("/workflows save <name> <runId> warns when run has no script", async () => {
+  const storage: any = { save: (w: any) => w };
+  let handler: any;
+  const { registerWorkflowCommands: reg3 } = await import("../src/workflow-commands.js");
+  const notified: Array<{ message: string; type?: string }> = [];
+  reg3(
+    { getCommands: () => [{ name: "xxx" }], registerCommand: (_n: string, o: any) => { handler = o.handler; }, sendMessage: async () => {} } as any,
+    { listRuns: () => [{ runId: "no-script", workflowName: "empty", status: "completed", agents: [], logs: [] }], getSnapshot: () => null, getRun: () => undefined, pause: () => false, resume: async () => false, stop: () => false, deleteRun: () => false } as any,
+    { storage },
+  );
+
+  if (handler) {
+    await handler("save empty no-script", { ui: { notify: (m: string, t?: string) => notified.push({ message: m, type: t }) } });
+  }
+  assert.equal(notified.length, 1);
+  assert.match(notified[0].message, /No run/, "should warn no script");
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// unknown subcommand
+// ═══════════════════════════════════════════════════════════════════════════
+
+test("/workflows <unknown> warns usage", async () => {
+  const h = harness();
+  await h.run("bogus");
+  assert.equal(h.notified.length, 1);
+  assert.equal(h.notified[0].type, "warning");
+  assert.match(h.notified[0].message, /Unknown subcommand/);
+});
