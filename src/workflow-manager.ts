@@ -359,9 +359,10 @@ export class WorkflowManager extends EventEmitter {
     // Allow resume when status is paused, failed, or aborted (those can restart).
     const active = this.runs.get(runId);
     if (active?.status === "running") return false;
+    if (active?.status === "aborted") return false;
 
     const persisted = this.persistence.load(runId);
-    if (!persisted?.script || persisted.status === "completed") return false;
+    if (!persisted?.script || persisted.status === "completed" || persisted.status === "aborted") return false;
 
     const controller = new AbortController();
     const managed: ManagedRun = {
