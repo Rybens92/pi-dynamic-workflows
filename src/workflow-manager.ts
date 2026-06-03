@@ -300,7 +300,8 @@ export class WorkflowManager extends EventEmitter {
   }
 
   private persistRun(managed: ManagedRun) {
-    this.persistence.save({
+    try {
+      this.persistence.save({
       runId: managed.runId,
       workflowName: managed.snapshot.name,
       // Persist the real script + journal so the run can be resumed. Runs live
@@ -330,6 +331,9 @@ export class WorkflowManager extends EventEmitter {
       completedAt: managed.status === "completed" ? new Date().toISOString() : undefined,
       durationMs: managed.result?.durationMs,
     });
+    } catch (err) {
+      // Silently handle persistence failures — the run is still healthy in memory.
+    }
   }
 
   /**
@@ -351,8 +355,10 @@ export class WorkflowManager extends EventEmitter {
    * and run the rest live. Returns false if there is nothing resumable.
    */
   async resume(runId: string): Promise<boolean> {
+    // Guard: a ManagedRun already exists for this ID and is still running.
+    // Allow resume when status is paused, failed, or aborted (those can restart).
     const active = this.runs.get(runId);
-    if (active?.status === "running") return false; // already running
+    if (active?.status === "running") return false;
 
     const persisted = this.persistence.load(runId);
     if (!persisted?.script || persisted.status === "completed") return false;

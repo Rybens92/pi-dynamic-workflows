@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createWebFetchTool, createWebSearchTool, createWebTools } from "../src/web-tools.js";
+import { createWebFetchTool, createWebSearchTool, createWebTools, htmlToText, parseBingResults } from "../src/web-tools.js";
 
 // ─── createWebSearchTool ─────────────────────────────────────────────────────
 
@@ -84,128 +84,88 @@ test("createWebTools each tool has execute", () => {
 
 // ─── HTML parsing (import internal functions via tsx) ──────────────────────────
 
-test("htmlToText strips HTML tags correctly", async () => {
-  const mod = await import("../src/web-tools.js");
-  const htmlToText = (mod as any).htmlToText;
-  if (htmlToText) {
-    assert.equal(htmlToText("<p>Hello</p>"), "Hello");
-    assert.equal(htmlToText("<div>Line1</div><div>Line2</div>").trim(), "Line1\nLine2");
-    assert.equal(htmlToText("Plain text"), "Plain text");
-    assert.equal(htmlToText("<script>var x=1;</script>content"), "content");
-    assert.equal(htmlToText("<style>.cls{}</style>content"), "content");
-  }
+test("htmlToText strips HTML tags correctly", () => {
+  assert.equal(htmlToText("<p>Hello</p>"), "Hello");
+  assert.equal(htmlToText("<div>Line1</div><div>Line2</div>").trim(), "Line1\nLine2");
+  assert.equal(htmlToText("Plain text"), "Plain text");
+  assert.equal(htmlToText("<script>var x=1;</script>content"), "content");
+  assert.equal(htmlToText("<style>.cls{}</style>content"), "content");
 });
 
-test("htmlToText converts HTML entities", async () => {
-  const mod = await import("../src/web-tools.js");
-  const htmlToText = (mod as any).htmlToText;
-  if (htmlToText) {
-    assert.equal(htmlToText("&amp;"), "&");
-    assert.equal(htmlToText("&lt;test&gt;"), "<test>");
-    assert.equal(htmlToText("&quot;hello&quot;"), '"hello"');
-    assert.equal(htmlToText("&nbsp;text"), " text");
-    assert.equal(htmlToText("&#39;it&#39;s&#39;"), "'it's'");
-    assert.equal(htmlToText("&apos;x&apos;"), "'x'");
-  }
+test("htmlToText converts HTML entities", () => {
+  assert.equal(htmlToText("&amp;"), "&");
+  assert.equal(htmlToText("&lt;test&gt;"), "<test>");
+  assert.equal(htmlToText("&quot;hello&quot;"), '"hello"');
+  assert.equal(htmlToText("hello&nbsp;world"), "hello world");
+  assert.equal(htmlToText("&#39;it&#39;s&#39;"), "'it's'");
+  assert.equal(htmlToText("&apos;x&apos;"), "'x'");
 });
 
-test("htmlToText normalizes whitespace", async () => {
-  const mod = await import("../src/web-tools.js");
-  const htmlToText = (mod as any).htmlToText;
-  if (htmlToText) {
-    const result = htmlToText("Hello    World");
-    assert.equal(result, "Hello World");
-  }
+test("htmlToText normalizes whitespace", () => {
+  const result = htmlToText("Hello    World");
+  assert.equal(result, "Hello World");
 });
 
-test("htmlToText collapses multiple newlines", async () => {
-  const mod = await import("../src/web-tools.js");
-  const htmlToText = (mod as any).htmlToText;
-  if (htmlToText) {
-    const result = htmlToText("Line1\n\n\n\nLine2");
-    assert.equal(result, "Line1\n\nLine2");
-  }
+test("htmlToText collapses multiple newlines", () => {
+  const result = htmlToText("Line1\n\n\n\nLine2");
+  assert.equal(result, "Line1\n\nLine2");
 });
 
-test("htmlToText replaces block element close tags with newlines", async () => {
-  const mod = await import("../src/web-tools.js");
-  const htmlToText = (mod as any).htmlToText;
-  if (htmlToText) {
-    const result = htmlToText("<p>Para1</p><p>Para2</p>");
-    assert.equal(result.trim(), "Para1\nPara2");
-    // li tags
-    const list = htmlToText("<li>Item1</li><li>Item2</li>");
-    assert.equal(list.trim(), "Item1\nItem2");
-  }
+test("htmlToText replaces block element close tags with newlines", () => {
+  const result = htmlToText("<p>Para1</p><p>Para2</p>");
+  assert.equal(result.trim(), "Para1\nPara2");
+  // li tags
+  const list = htmlToText("<li>Item1</li><li>Item2</li>");
+  assert.equal(list.trim(), "Item1\nItem2");
 });
 
-test("parseBingResults extracts results from mock HTML", async () => {
-  const mod = await import("../src/web-tools.js");
-  const parseBingResults = (mod as any).parseBingResults;
-  if (parseBingResults) {
-    const mockHtml = `
-      <h2><a href="https://example.com/page1">First Result</a></h2>
-      <h2><a href="https://example.com/page2">Second Result</a></h2>
-    `;
-    const results = parseBingResults(mockHtml, 5);
-    assert.equal(results.length, 2);
-    assert.equal(results[0].url, "https://example.com/page1");
-    assert.equal(results[0].title, "First Result");
-    assert.equal(results[1].url, "https://example.com/page2");
-    assert.equal(results[1].title, "Second Result");
-  }
+test("parseBingResults extracts results from mock HTML", () => {
+  const mockHtml = `
+    <h2><a href="https://example.com/page1">First Result</a></h2>
+    <h2><a href="https://example.com/page2">Second Result</a></h2>
+  `;
+  const results = parseBingResults(mockHtml, 5);
+  assert.equal(results.length, 2);
+  assert.equal(results[0].url, "https://example.com/page1");
+  assert.equal(results[0].title, "First Result");
+  assert.equal(results[1].url, "https://example.com/page2");
+  assert.equal(results[1].title, "Second Result");
 });
 
-test("parseBingResults respects limit and filters bing/microsoft domains", async () => {
-  const mod = await import("../src/web-tools.js");
-  const parseBingResults = (mod as any).parseBingResults;
-  if (parseBingResults) {
-    const mockHtml = `
-      <h2><a href="https://www.bing.com/search">Bing Link</a></h2>
-      <h2><a href="https://example.com/1">Result 1</a></h2>
-      <h2><a href="https://go.microsoft.com/link">Microsoft Link</a></h2>
-      <h2><a href="https://example.com/2">Result 2</a></h2>
-      <h2><a href="https://example.com/3">Result 3</a></h2>
-    `;
-    const results = parseBingResults(mockHtml, 2);
-    assert.equal(results.length, 2);
-    assert.equal(results[0].url, "https://example.com/1");
-    assert.equal(results[1].url, "https://example.com/2");
-  }
+test("parseBingResults respects limit and filters bing/microsoft domains", () => {
+  const mockHtml = `
+    <h2><a href="https://www.bing.com/search">Bing Link</a></h2>
+    <h2><a href="https://example.com/1">Result 1</a></h2>
+    <h2><a href="https://go.microsoft.com/link">Microsoft Link</a></h2>
+    <h2><a href="https://example.com/2">Result 2</a></h2>
+    <h2><a href="https://example.com/3">Result 3</a></h2>
+  `;
+  const results = parseBingResults(mockHtml, 2);
+  assert.equal(results.length, 2);
+  assert.equal(results[0].url, "https://example.com/1");
+  assert.equal(results[1].url, "https://example.com/2");
 });
 
-test("parseBingResults deduplicates URLs", async () => {
-  const mod = await import("../src/web-tools.js");
-  const parseBingResults = (mod as any).parseBingResults;
-  if (parseBingResults) {
-    const mockHtml = `
-      <h2><a href="https://example.com/dup">Dup</a></h2>
-      <h2><a href="https://example.com/dup">Dup Again</a></h2>
-      <h2><a href="https://example.com/unique">Unique</a></h2>
-    `;
-    const results = parseBingResults(mockHtml, 5);
-    assert.equal(results.length, 2, "should deduplicate URLs");
-  }
+test("parseBingResults deduplicates URLs", () => {
+  const mockHtml = `
+    <h2><a href="https://example.com/dup">Dup</a></h2>
+    <h2><a href="https://example.com/dup">Dup Again</a></h2>
+    <h2><a href="https://example.com/unique">Unique</a></h2>
+  `;
+  const results = parseBingResults(mockHtml, 5);
+  assert.equal(results.length, 2, "should deduplicate URLs");
 });
 
-test("parseBingResults handles empty HTML", async () => {
-  const mod = await import("../src/web-tools.js");
-  const parseBingResults = (mod as any).parseBingResults;
-  if (parseBingResults) {
-    assert.deepEqual(parseBingResults("", 5), []);
-    assert.deepEqual(parseBingResults("<html></html>", 5), []);
-  }
+test("parseBingResults handles empty HTML", () => {
+  assert.deepEqual(parseBingResults("", 5), []);
+  assert.deepEqual(parseBingResults("<html></html>", 5), []);
 });
 
-test("parseBingResults strips inner HTML from titles", async () => {
-  const mod = await import("../src/web-tools.js");
-  const parseBingResults = (mod as any).parseBingResults;
-  if (parseBingResults) {
-    const mockHtml = `
-      <h2><a href="https://example.com/page"><strong>Bold</strong> Title</a></h2>
-    `;
-    const results = parseBingResults(mockHtml, 5);
-    assert.equal(results.length, 1);
-    assert.equal(results[0].title, "Bold Title", "HTML tags should be stripped from title");
-  }
+test("parseBingResults strips inner HTML from titles", () => {
+  const mockHtml = `
+    <h2><a href="https://example.com/page"><strong>Bold</strong> Title</a></h2>
+  `;
+  const results = parseBingResults(mockHtml, 5);
+  assert.equal(results.length, 1);
+  assert.equal(results[0].title, "Bold Title", "HTML tags should be stripped from title");
 });
