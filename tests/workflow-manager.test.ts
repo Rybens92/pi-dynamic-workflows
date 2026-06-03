@@ -1340,3 +1340,219 @@ test(
     await Promise.allSettled([r1.promise, r2.promise]);
   }),
 );
+
+// ─── Failed state transition tests ─────────────────────────────────────────────
+
+test(
+  "pause returns false for failed run",
+  withTempCwd(async (cwd) => {
+    const da = deferredAgent();
+    const manager = new WorkflowManager({ cwd, agent: da.runner });
+    manager.on("error", () => {});
+
+    const { runId, promise: origPromise } = manager.startInBackground(oneAgentScript);
+    await new Promise((r) => setTimeout(r, 20));
+
+    // Pause the running run so we can resume with a failing agent
+    assert.equal(manager.pause(runId), true, "pause should succeed");
+    assert.equal(manager.getRun(runId)?.status, "paused");
+
+    // Mock agent to throw a non-recoverable WorkflowError, making the run fail
+    test.mock.method(da.runner, "run", async (_prompt: string) => {
+      throw new WorkflowError(
+        "fatal agent error",
+        WorkflowErrorCode.AGENT_EXECUTION_ERROR,
+        { recoverable: false },
+      );
+    });
+
+    try {
+      // Resume — the run will fail because the mocked agent throws
+      const resumed = await manager.resume(runId);
+      assert.equal(resumed, true, "resume should schedule the run");
+      await new Promise((r) => setTimeout(r, 100));
+
+      // Verify the run is now in failed state
+      const failedRun = manager.getRun(runId);
+      assert.equal(failedRun?.status, "failed", "run should be in failed state");
+      assert.ok(failedRun?.error instanceof WorkflowError, "error should be a WorkflowError");
+
+      // pause() should return false for a failed run (requires status === "running")
+      const paused = manager.pause(runId);
+      assert.equal(paused, false, "pause should return false for failed run");
+      assert.equal(
+        manager.getRun(runId)?.status,
+        "failed",
+        "status should remain failed after rejected pause",
+      );
+    } finally {
+      da.runner.run = async (_prompt: string) => "done";
+      da.resolve("done");
+      await origPromise.catch(() => {});
+    }
+  }),
+);
+
+test(
+  "stop returns false for failed run",
+  withTempCwd(async (cwd) => {
+    const da = deferredAgent();
+    const manager = new WorkflowManager({ cwd, agent: da.runner });
+    manager.on("error", () => {});
+
+    const { runId, promise: origPromise } = manager.startInBackground(oneAgentScript);
+    await new Promise((r) => setTimeout(r, 20));
+
+    // Pause the running run so we can resume with a failing agent
+    assert.equal(manager.pause(runId), true, "pause should succeed");
+    assert.equal(manager.getRun(runId)?.status, "paused");
+
+    // Mock agent to throw a non-recoverable WorkflowError
+    test.mock.method(da.runner, "run", async (_prompt: string) => {
+      throw new WorkflowError(
+        "fatal agent error",
+        WorkflowErrorCode.AGENT_EXECUTION_ERROR,
+        { recoverable: false },
+      );
+    });
+
+    try {
+      // Resume — the run will fail
+      const resumed = await manager.resume(runId);
+      assert.equal(resumed, true, "resume should schedule the run");
+      await new Promise((r) => setTimeout(r, 100));
+
+      // Verify the run is now in failed state
+      const failedRun = manager.getRun(runId);
+      assert.equal(failedRun?.status, "failed", "run should be in failed state");
+      assert.ok(failedRun?.error instanceof WorkflowError, "error should be a WorkflowError");
+
+      // stop() should return false for a failed run (requires "running" or "paused")
+      const stopped = manager.stop(runId);
+      assert.equal(stopped, false, "stop should return false for failed run");
+      assert.equal(
+        manager.getRun(runId)?.status,
+        "failed",
+        "status should remain failed after rejected stop",
+      );
+    } finally {
+      da.runner.run = async (_prompt: string) => "done";
+      da.resolve("done");
+      await origPromise.catch(() => {});
+    }
+  }),
+);
+
+test(
+  "resume restarts a failed run",
+  withTempCwd(async (cwd) => {
+    const da = deferredAgent();
+    const manager = new WorkflowManager({ cwd, agent: da.runner });
+    manager.on("error", () => {});
+
+    const { runId, promise: origPromise } = manager.startInBackground(oneAgentScript);
+    await new Promise((r) => setTimeout(r, 20));
+
+    // Pause the running run
+    assert.equal(manager.pause(runId), true, "pause should succeed");
+    assert.equal(manager.getRun(runId)?.status, "paused");
+
+    // Mock agent to throw a non-recoverable WorkflowError
+    test.mock.method(da.runner, "run", async (_prompt: string) => {
+      throw new WorkflowError(
+        "fatal agent error",
+        WorkflowErrorCode.AGENT_EXECUTION_ERROR,
+        { recoverable: false },
+      );
+    });
+
+    try {
+      // Resume — the run will fail
+      await manager.resume(runId);
+      await new Promise((r) => setTimeout(r, 100));
+
+      // Verify the run is now in failed state
+      const failedRun = manager.getRun(runId);
+      assert.equal(failedRun?.status, "failed", "run should be in failed state");
+      assert.ok(failedRun?.error instanceof WorkflowError, "error should be a WorkflowError");
+    } finally {
+      // Restore the runner so the resumed run's agent call succeeds
+      da.runner.run = async (_prompt: string) => "done";
+      da.resolve("done");
+      await origPromise.catch(() => {});
+    }
+
+    // Resume the failed run — resume() allows failed status
+    const resumed = await manager.resume(runId);
+    assert.equal(resumed, true, "resume should return true for a failed run");
+    assert.equal(
+      manager.getRun(runId)?.status,
+      "running",
+      "resumed failed run should transition to running",
+    );
+
+    // Wait for the resumed run to complete successfully
+    await new Promise((r) => setTimeout(r, 100));
+
+    const finalRun = manager.getRun(runId);
+    assert.equal(
+      finalRun?.status,
+      "completed",
+      "resumed failed run should complete successfully after restore",
+    );
+  }),
+);
+
+// ─── parallel() concurrency tests ───────────────────────────────────────────
+
+test(
+  "parallel executes all items",
+  withTempCwd(async (cwd) => {
+    const manager = new WorkflowManager({ cwd, agent: fakeAgent() });
+    const script = `export const meta = { name: 'parallel_count', description: 'count parallel agents' }
+const results = await parallel([1,2,3].map(n => () => agent('task ' + n)))
+return results`;
+    const result = await manager.runSync(script);
+    assert.equal(result.agentCount, 3, "parallel should execute all 3 agents");
+    assert.ok(Array.isArray(result.result), "result should be an array");
+    assert.equal(result.result.length, 3);
+  }),
+);
+
+test(
+  "parallel returns results in order",
+  withTempCwd(async (cwd) => {
+    const manager = new WorkflowManager({
+      cwd,
+      agent: {
+        async run(prompt: string) {
+          return prompt;
+        },
+      },
+    });
+    const script = `export const meta = { name: 'parallel_order', description: 'check parallel order' }
+const results = await parallel([1,2,3].map(n => () => agent('task ' + n)))
+return results`;
+    const result = await manager.runSync(script);
+    assert.equal(result.agentCount, 3, "3 agents should have run");
+    assert.deepEqual(
+      result.result,
+      ["task 1", "task 2", "task 3"],
+      "parallel should return results in input order",
+    );
+  }),
+);
+
+test(
+  "parallel with empty array returns empty",
+  withTempCwd(async (cwd) => {
+    const manager = new WorkflowManager({ cwd, agent: fakeAgent() });
+    const script = `export const meta = { name: 'parallel_empty', description: 'empty parallel' }
+const results = await parallel([])
+return results`;
+    const result = await manager.runSync(script);
+    assert.ok(Array.isArray(result.result), "result should be an array");
+    assert.equal(result.result.length, 0, "empty parallel should return empty array");
+    assert.equal(result.agentCount, 0, "no agents should run with empty parallel");
+  }),
+);
