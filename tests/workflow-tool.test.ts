@@ -90,13 +90,14 @@ test("modelRoutingGuideline explains tier vs model priority", () => {
   );
 });
 
-test("modelRoutingGuideline includes available models list", () => {
+test("modelRoutingGuideline references the model scope (auth-independent)", () => {
   const text = modelRoutingGuideline();
-  assert.ok(text.includes("available models"), "should mention available models");
-  // Should reference the list of models, even if empty
+  // With auth configured it lists the available models; on a fresh/CI machine
+  // with no models it falls back to a generic line. Accept either so the test
+  // doesn't depend on the runner's authenticated providers.
   assert.ok(
-    text.includes("route only to these") || text.includes("available models"),
-    "should explain which models are in scope",
+    text.includes("route only to these") || text.includes("models the user has configured"),
+    "should explain which models are in scope (listed or fallback)",
   );
 });
 
