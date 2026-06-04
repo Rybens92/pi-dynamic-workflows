@@ -33,7 +33,7 @@ export function modelRoutingGuideline(): string {
     "Small tier: lightweight exploration/search/inventory agents.",
     "Medium tier: balanced analysis agents (default when omitted).",
     "Big tier: synthesis/judgment/decision agents spanning the full context.",
-    "If the user named a specific model, use opts.model with that exact provider/id.",
+    "If the user named a specific model, use opts.model with that exact provider/id; opts.model always takes precedence over opts.tier.",
     list,
   ].join(" ");
 }
@@ -151,7 +151,6 @@ export function createWorkflowTool(options: WorkflowToolOptions = {}): ToolDefin
         key: "workflow",
         streamToolUpdates: true,
         maxAgents: 4,
-        maxLogs: 1,
         showResultPreviews: false,
       });
 
@@ -236,7 +235,6 @@ export function createWorkflowTool(options: WorkflowToolOptions = {}): ToolDefin
       const raw = text?.type === "text" ? text.text : theme.fg("muted", "workflow");
       const clean = raw
         .replace(/\*\*/g, "")
-        .replace(/\*\*(\S)/g, "$1")
         .replace(/```[a-z]*\n/g, "")
         .replace(/```/g, "")
         .replace(/^##+\s*/gm, "")

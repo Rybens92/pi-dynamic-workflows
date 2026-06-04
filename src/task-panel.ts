@@ -18,27 +18,27 @@ export interface TaskPanelOptions {
   cwd?: string;
 }
 
+/**
+ * Pick a clean human-readable summary from a workflow result, in order of
+ * preference: a `verdict`/`report`/`summary` string field, a bare string
+ * result, else a truncated JSON dump.
+ */
+function summarizeResult(result: unknown): string {
+  if (typeof result === "string") return result;
+  if (result == null) return "null";
+  if (typeof result === "object") {
+    const obj = result as Record<string, unknown>;
+    for (const key of ["verdict", "report", "summary"] as const) {
+      const val = obj[key];
+      if (typeof val === "string" && val.trim()) return val;
+    }
+  }
+  const json = JSON.stringify(result, null, 2);
+  return json.length > 400 ? `${json.slice(0, 400)}\n…(truncated)` : json;
+}
+
 export function deliverText(run: ManagedRun): string {
-  const result = run.result?.result as Record<string, unknown> | undefined;
-  // Try to find a clean text summary in order of preference:
-  // 1. verdict (most common for orchestrate/deep-research workflows)
-  // 2. report (custom report property)
-  // 3. summary (short summary)
-  // 4. string result directly
-  // 5. fallback: first 400 chars of JSON
-  const summary =
-    result && typeof result.verdict === "string" && result.verdict.trim()
-      ? result.verdict
-      : result && typeof result.report === "string" && result.report.trim()
-        ? result.report
-        : result && typeof result.summary === "string" && result.summary.trim()
-          ? result.summary
-          : typeof result === "string"
-            ? result
-            : result != null
-              ? JSON.stringify(result, null, 2).slice(0, 400) +
-                (JSON.stringify(result, null, 2).length > 400 ? "\n…(truncated)" : "")
-              : "null";
+  const summary = summarizeResult(run.result?.result);
   const tokens = run.result?.tokenUsage ? ` · ${run.result.tokenUsage.total.toLocaleString()} tokens` : "";
   const agents = run.result?.agentCount ?? run.snapshot.agentCount;
   const duration = run.result?.durationMs ? ` · ${(run.result.durationMs / 1000).toFixed(1)}s` : "";
@@ -74,12 +74,16 @@ export function installResultDelivery(pi: ExtensionAPI, manager: WorkflowManager
 
   const deliver = (content: string) => {
     try {
-      void m.__holder?.pi.sendMessage(
+      const ret = m.__holder?.pi.sendMessage(
         { customType: "workflow-result", content, display: true },
         { triggerTurn: true, deliverAs: "followUp" },
       );
+      // sendMessage may return a promise; a sync try/catch can't catch its
+      // rejection, so swallow the async path too. A stale ctx after /reload is
+      // the expected failure — the result is still visible via /workflows.
+      void Promise.resolve(ret).catch(() => {});
     } catch {
-      // Stale ctx after reload — result still visible via /workflows.
+      // Synchronous failure (e.g. stale ctx) — result still visible via /workflows.
     }
   };
 

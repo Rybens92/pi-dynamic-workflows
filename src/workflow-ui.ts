@@ -240,12 +240,6 @@ export class NavigatorState {
     return cursor < runCount ? "run" : "saved";
   }
 
-  /** Live cursor position within the current view's items. */
-  itemCursor(_model: NavigatorModel): number {
-    if (this.kind === "runs") return this.cursor;
-    return this.top().cursor;
-  }
-
   /** Clamp the cursor to [0, count). */
   clamp(count: number) {
     const t = this.top();
@@ -614,14 +608,17 @@ export function openWorkflowNavigator(
             } else if (!opts.storage) {
               ui.notify("Saving is not available (no storage)", "error");
             } else {
+              const storage = opts.storage;
               const name = run.workflowName || "workflow";
-              const saved = opts.storage.save({
+              const saved = storage.save({
                 name,
                 description: run.workflowName,
                 script: run.script,
                 location: "project",
               });
-              registerSavedWorkflow(pi, opts.cwd ?? process.cwd(), saved);
+              registerSavedWorkflow(pi, opts.cwd ?? process.cwd(), saved, undefined, () =>
+                storage.list().some((w) => w.name === saved.name),
+              );
               ui.notify(`Saved /${name}`, "info");
             }
             break;

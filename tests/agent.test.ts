@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { AgentRunOptions, AgentUsage } from "../src/agent.js";
-import { listAvailableModelSpecs, WorkflowAgent } from "../src/agent.js";
+import { listAvailableModelSpecs, resolveAgentModelSpec, WorkflowAgent } from "../src/agent.js";
+import type { ModelTierConfig } from "../src/model-tier-config.js";
 import { runWorkflow } from "../src/workflow.js";
 
 // Private methods used for testing - cast to this type to access them without `any`
@@ -27,51 +28,61 @@ test("listAvailableModelSpecs entries have provider/model format when non-empty"
   }
 });
 
-test("WorkflowAgent constructor accepts options", () => {
-  const agent = new WorkflowAgent({ cwd: "/tmp" });
-  assert.ok(agent instanceof WorkflowAgent, "agent should be instance of WorkflowAgent");
+// ═══════════════════════════════════════════════════════════════════════════
+// resolveAgentModelSpec — model precedence: explicit model > tier > main model
+// ═══════════════════════════════════════════════════════════════════════════
+
+const tierConfig: ModelTierConfig = {
+  tiers: { small: "vendor/small", medium: "vendor/medium", big: "vendor/big" },
+};
+const loadCfg = () => tierConfig;
+const noCfg = () => null;
+
+test("resolveAgentModelSpec: explicit model wins over tier (the precedence bug fix)", () => {
+  // Even with a tier set AND a config that resolves it, an explicit model wins.
+  assert.equal(
+    resolveAgentModelSpec({ model: "explicit/model", tier: "small" }, "main/model", loadCfg),
+    "explicit/model",
+  );
 });
 
-test("WorkflowAgent constructor works without options", () => {
-  const agent = new WorkflowAgent();
-  assert.ok(agent instanceof WorkflowAgent, "agent should be instance of WorkflowAgent");
+test("resolveAgentModelSpec: explicit model wins even when no config exists", () => {
+  assert.equal(
+    resolveAgentModelSpec({ model: "explicit/model", tier: "small" }, "main/model", noCfg),
+    "explicit/model",
+  );
 });
 
-test("WorkflowAgent with custom instructions", () => {
-  const agent = new WorkflowAgent({
-    cwd: "/tmp",
-    instructions: "custom instruction",
-  });
-  assert.ok(agent instanceof WorkflowAgent, "agent should be instance of WorkflowAgent");
+test("resolveAgentModelSpec: tier resolves from config when no explicit model", () => {
+  assert.equal(resolveAgentModelSpec({ tier: "big" }, "main/model", loadCfg), "vendor/big");
 });
 
-test("WorkflowAgent constructor handles all option combinations gracefully", () => {
-  const agent = new WorkflowAgent({
-    cwd: "/tmp",
-    tools: [],
-    session: {},
-    instructions: "test",
-  });
-  assert.ok(agent instanceof WorkflowAgent, "agent should be instance of WorkflowAgent");
+test("resolveAgentModelSpec: unconfigured tier falls back to the main model", () => {
+  assert.equal(resolveAgentModelSpec({ tier: "small" }, "main/model", noCfg), "main/model");
+  assert.equal(resolveAgentModelSpec({ tier: "unknown-tier" }, "main/model", loadCfg), "main/model");
 });
 
-test("WorkflowAgent constructor accepts mainModel option", () => {
-  const agent = new WorkflowAgent({
-    cwd: "/tmp",
-    mainModel: "openai/gpt-4.1",
-  });
-  assert.ok(agent instanceof WorkflowAgent, "agent should be instance of WorkflowAgent");
+test("resolveAgentModelSpec: returns undefined when neither model nor tier is set", () => {
+  assert.equal(resolveAgentModelSpec({}, "main/model", loadCfg), undefined);
 });
 
-test("WorkflowAgent constructor handles all options including mainModel", () => {
-  const agent = new WorkflowAgent({
-    cwd: "/tmp",
-    tools: [],
-    session: {},
-    instructions: "test",
-    mainModel: "openai/gpt-4.1",
-  });
-  assert.ok(agent instanceof WorkflowAgent, "agent should be instance of WorkflowAgent");
+test("resolveAgentModelSpec: tier with no main model and no config yields undefined", () => {
+  assert.equal(resolveAgentModelSpec({ tier: "small" }, undefined, noCfg), undefined);
+});
+
+test("WorkflowAgent constructor accepts all option shapes without throwing", () => {
+  const optionSets = [
+    undefined,
+    { cwd: "/tmp" },
+    { cwd: "/tmp", instructions: "custom instruction" },
+    { cwd: "/tmp", tools: [], session: {}, instructions: "test" },
+    { cwd: "/tmp", mainModel: "openai/gpt-4.1" },
+    { cwd: "/tmp", tools: [], session: {}, instructions: "test", mainModel: "openai/gpt-4.1" },
+  ];
+  for (const opts of optionSets) {
+    const agent = opts ? new WorkflowAgent(opts) : new WorkflowAgent();
+    assert.ok(agent instanceof WorkflowAgent, `agent should be constructed for options: ${JSON.stringify(opts)}`);
+  }
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -443,27 +454,4 @@ test("agent() monitors agent count and calls onAgentStart/End for each", async (
   assert.equal(counts.length, 2);
   assert.ok(counts[0] > 0, "first agent tokens");
   assert.ok(counts[1] > 0, "second agent tokens");
-});
-
-test("agent() with structured output schema creates schema tool", async () => {
-  const toolSeen: any[] = [];
-  const capturingRunner = {
-    async run(_prompt: string, options: any) {
-      toolSeen.push(...(options.tools ?? []));
-      // If there's a structured_output tool, simulate calling it
-      const soTool = (options.tools ?? []).find((t: any) => t.name === "structured_output");
-      if (soTool) {
-        return soTool.execute("call1", { result: "schema-validated" });
-      }
-      return "plain result";
-    },
-  };
-  const _result = await runWorkflow<unknown>(
-    `export const meta = { name: 'test', description: 't' }
-     const r = await agent('return result', { label: 't' })
-     return r`,
-    { agent: capturingRunner, persistLogs: false },
-  );
-  // Without schema, the agent() call passes no tools; the runner returns plain text
-  assert.ok(true, "agent() ran without throwing");
 });

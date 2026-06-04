@@ -12,8 +12,31 @@ import {
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import type { Static, TSchema } from "typebox";
-import { loadModelTierConfig, resolveTierModel } from "./model-tier-config.js";
+import { loadModelTierConfig, type ModelTierConfig, resolveTierModel } from "./model-tier-config.js";
 import { createStructuredOutputTool, type StructuredOutputCapture } from "./structured-output.js";
+
+/**
+ * Resolve which concrete model spec a subagent should use. Precedence, most
+ * specific first:
+ *   1. options.model — an explicit per-agent model always wins.
+ *   2. options.tier  — resolved via the model-tiers config, falling back to the
+ *      session's main model when the tier has no configured entry.
+ * Returns undefined when neither is set, so the session default applies.
+ *
+ * `loadConfig` is injectable for testing; it defaults to reading from disk.
+ */
+export function resolveAgentModelSpec(
+  options: { model?: string; tier?: string },
+  mainModel: string | undefined,
+  loadConfig: () => ModelTierConfig | null = loadModelTierConfig,
+): string | undefined {
+  if (options.model) return options.model;
+  if (options.tier) {
+    const config = loadConfig();
+    return (config ? resolveTierModel(options.tier, config) : undefined) ?? mainModel;
+  }
+  return undefined;
+}
 
 export interface WorkflowAgentOptions {
   cwd?: string;
@@ -77,12 +100,12 @@ export interface AgentRunOptions<TSchemaDef extends TSchema | undefined = undefi
    */
   model?: string;
   /**
-   * Model tier name (e.g. "small", "medium", "big"). When set, the model is
-   * resolved from the user's model-tiers.json config before `run()` starts.
-   * Takes priority over `model` when both are provided — the tier is resolved
-   * first, and if it yields a concrete model, that model is used instead of
-   * the `model` field. This lets workflow scripts use `{ tier: "small" }`
-   * without caring which concrete model backs that tier.
+   * Model tier name (e.g. "small", "medium", "big"). When set (and no explicit
+   * `model` is given), the model is resolved from the user's model-tiers.json
+   * config before `run()` starts, falling back to the session's main model when
+   * the tier has no configured entry. An explicit `model` always takes priority,
+   * so workflow scripts can use `{ tier: "small" }` for coarse routing without
+   * caring which concrete model backs that tier.
    */
   tier?: string;
   /** Called with the resolved model id once known (for display/telemetry). */
@@ -152,24 +175,10 @@ export class WorkflowAgent {
       customTools.push(createStructuredOutputTool({ schema: options.schema, capture }) as unknown as ToolDefinition);
     }
 
-    // Resolve tier (if set) → concrete model spec, then resolve to a Model object.
-    // Tier takes priority over explicit model: if the tier resolves to a model,
-    // that model is used even when `options.model` is also set.
-    let resolvedModelSpec: string | undefined;
-    if (options.tier) {
-      const tierConfig = loadModelTierConfig();
-      if (tierConfig) {
-        resolvedModelSpec = resolveTierModel(options.tier, tierConfig);
-      }
-      // No config yet or tier not found => fall back to the main session model.
-      // This lets workflows use `{ tier: "small" }` without any setup.
-      if (!resolvedModelSpec && this.mainModel) {
-        resolvedModelSpec = this.mainModel;
-      }
-    }
-
-    // Fall back to explicit model spec when tier didn't resolve
-    const modelSpec = resolvedModelSpec ?? options.model;
+    // Resolve the model spec (explicit model > tier > session default). This
+    // composes with phase-based routing in workflow.ts, which only supplies
+    // options.model when a phase pattern matches — so an explicit model wins.
+    const modelSpec = resolveAgentModelSpec(options, this.mainModel);
 
     // Resolve a requested model spec to a Model object. A given-but-unresolved
     // spec falls back to the session default (with a warning) rather than failing.

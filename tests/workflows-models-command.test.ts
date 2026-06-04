@@ -10,9 +10,6 @@
  */
 
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { describe, it, mock } from "node:test";
 
 async function loadCommand() {
@@ -119,45 +116,6 @@ describe("workflows-models-command", () => {
       const result = await editSingleTier(ctx as never, tiers, "small");
       assert.ok(result, "should return updated tiers");
       assert.equal(result.small, "openai/gpt-4.1-mini");
-    });
-  });
-
-  describe("integration with model-tier-config", () => {
-    it("ensureModelTierConfig creates default on fresh install", async () => {
-      const { ensureModelTierConfig } = await import("../src/model-tier-config.js");
-      const tmpDir = mkdtempSync(join(tmpdir(), "mtc-cmd-test-"));
-      const cfgPath = join(tmpDir, "model-tiers.json");
-
-      const config = ensureModelTierConfig(cfgPath);
-      assert.ok(config.tiers, "should have tiers");
-      for (const model of Object.values(config.tiers)) {
-        assert.equal(typeof model, "string", "each tier value should be a string");
-      }
-
-      rmSync(tmpDir, { recursive: true, force: true });
-    });
-
-    it("save/load round-trip works with single-model config", async () => {
-      const { saveModelTierConfig, loadModelTierConfig } = await import("../src/model-tier-config.js");
-      const tmpDir = mkdtempSync(join(tmpdir(), "mtc-cmd-test-"));
-      const cfgPath = join(tmpDir, "model-tiers.json");
-
-      const config = {
-        tiers: {
-          small: "gpt-4.1-mini",
-          medium: "gpt-4.1",
-          big: "gpt-5",
-        },
-      };
-
-      saveModelTierConfig(config, cfgPath);
-      const loaded = loadModelTierConfig(cfgPath);
-      assert.ok(loaded, "should load successfully");
-      assert.equal(loaded?.tiers.small, "gpt-4.1-mini");
-      assert.equal(loaded?.tiers.medium, "gpt-4.1");
-      assert.equal(loaded?.tiers.big, "gpt-5");
-
-      rmSync(tmpDir, { recursive: true, force: true });
     });
   });
 });

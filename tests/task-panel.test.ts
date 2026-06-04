@@ -12,7 +12,7 @@ type TaskPanelModule = {
 let mod: TaskPanelModule;
 
 before(async () => {
-  mod = (await import("../dist/task-panel.js")) as TaskPanelModule;
+  mod = (await import("../src/task-panel.js")) as TaskPanelModule;
 });
 
 // ─── Pure-function tests (tested indirectly via installResultDelivery) ─────────

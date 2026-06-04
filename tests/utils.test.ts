@@ -4,15 +4,15 @@ import type { WorkflowAgentSnapshot } from "../src/display.js";
 import type { WorkflowMeta } from "../src/workflow.js";
 
 async function loadErrors() {
-  return import("../dist/errors.js");
+  return import("../src/errors.js");
 }
 
 async function loadConfig() {
-  return import("../dist/config.js");
+  return import("../src/config.js");
 }
 
 async function loadLogger() {
-  return import("../dist/logger.js");
+  return import("../src/logger.js");
 }
 
 // ─── Errors ────────────────────────────────────────────────────────────────────
@@ -350,5 +350,5 @@ describe("display", () => {
 });
 
 async function load() {
-  return import("../dist/display.js");
+  return import("../src/display.js");
 }

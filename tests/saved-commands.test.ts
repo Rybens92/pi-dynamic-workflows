@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { makeCommandRegistryPi, makeNotifyCtx } from "./helpers/mock-pi.js";
 
 async function load() {
-  return import("../dist/saved-commands.js");
+  return import("../src/saved-commands.js");
 }
 
 describe("parseCommandArgs", () => {
@@ -70,48 +71,30 @@ describe("parseCommandArgs", () => {
 describe("registerSavedWorkflow", () => {
   it("registers a command with the workflow name", async () => {
     const { registerSavedWorkflow } = await load();
-    const commands: Array<{ name: string; description: string; handler: (...args: unknown[]) => unknown }> = [];
-    const pi = {
-      getCommands: () => commands.map((c) => ({ name: c.name })),
-      registerCommand: (name: string, spec: { description: string; handler: (...args: unknown[]) => unknown }) => {
-        commands.push({ name, ...spec });
-      },
-    };
+    const { pi, commands } = makeCommandRegistryPi();
     const wf = {
       name: "test-workflow",
       script: "export const meta = { name: 't', description: 't' };",
       description: "A test",
     };
 
-    registerSavedWorkflow(pi as never, "/cwd", wf);
+    registerSavedWorkflow(pi, "/cwd", wf);
     assert.equal(commands.length, 1);
     assert.equal(commands[0].name, "test-workflow");
   });
 
   it("is idempotent — second registration is skipped", async () => {
     const { registerSavedWorkflow } = await load();
-    let regCount = 0;
-    const pi = {
-      getCommands: () => [{ name: "test-workflow" }],
-      registerCommand: () => {
-        regCount++;
-      },
-    };
+    const { pi, commands } = makeCommandRegistryPi(["test-workflow"]);
     const wf = { name: "test-workflow", script: "export const meta = { name: 't', description: 't' };" };
 
-    registerSavedWorkflow(pi as never, "/cwd", wf);
-    assert.equal(regCount, 0, "should not re-register when already present");
+    registerSavedWorkflow(pi, "/cwd", wf);
+    assert.equal(commands.length, 0, "should not re-register when already present");
   });
 
   it("registers multiple saved workflows", async () => {
     const { registerAllSavedWorkflows } = await load();
-    const commands: string[] = [];
-    const pi = {
-      getCommands: () => commands.map((name) => ({ name })),
-      registerCommand: (name: string) => {
-        commands.push(name);
-      },
-    };
+    const { pi, commands } = makeCommandRegistryPi();
     const storage = {
       list: () => [
         { name: "wf1", script: "export..." },
@@ -119,8 +102,11 @@ describe("registerSavedWorkflow", () => {
       ],
     };
 
-    registerAllSavedWorkflows(pi as never, "/cwd", storage as never);
-    assert.deepEqual(commands, ["wf1", "wf2"]);
+    registerAllSavedWorkflows(pi, "/cwd", storage as never);
+    assert.deepEqual(
+      commands.map((c) => c.name),
+      ["wf1", "wf2"],
+    );
   });
 
   it("runs through WorkflowManager when provided", async () => {
@@ -133,52 +119,50 @@ describe("registerSavedWorkflow", () => {
       },
     };
 
-    const commands: Array<{ name: string; handler: (...args: unknown[]) => unknown }> = [];
-    const pi = {
-      getCommands: () => commands.map((c) => ({ name: c.name })),
-      registerCommand: (name: string, spec: { handler: (...args: unknown[]) => unknown }) => {
-        commands.push({ name, handler: spec.handler });
-      },
-    };
-
+    const { pi, commands } = makeCommandRegistryPi();
     const wf = { name: "run-via-manager", script: "export..." };
-    registerSavedWorkflow(pi as never, "/cwd", wf, manager as never);
+    registerSavedWorkflow(pi, "/cwd", wf, manager as never);
 
-    // Execute the handler
-    const ctx = {
-      ui: { notify: () => {}, setStatus: () => {} },
-    };
-    await commands[0].handler("", ctx as never);
+    const { ctx } = makeNotifyCtx();
+    await commands[0].handler("", ctx);
 
     assert.equal(startedBackground, true, "should use startInBackground when manager provided");
   });
 
-  it("falls back to runWorkflow when no manager", async () => {
+  it("falls back to runWorkflow (inline) when no manager is provided", async () => {
     const { registerSavedWorkflow } = await load();
+    const { pi, commands, sent } = makeCommandRegistryPi();
 
-    const commands: Array<{ name: string; handler: (...args: unknown[]) => unknown }> = [];
-    const pi = {
-      getCommands: () => commands.map((c) => ({ name: c.name })),
-      registerCommand: (name: string, spec: { handler: (...args: unknown[]) => unknown }) => {
-        commands.push({ name, handler: spec.handler });
-      },
+    // A script with no agent() calls runs to completion inline without a manager.
+    const wf = {
+      name: "run-inline",
+      script: "export const meta = { name: 't', description: 't' };\nreturn { report: 'done' };",
     };
+    registerSavedWorkflow(pi, "/cwd", wf); // no manager
 
-    const wf = { name: "run-inline", script: "export const meta = { name: 't', description: 't' };" };
-    registerSavedWorkflow(pi as never, "/cwd", wf); // no manager
+    const { ctx } = makeNotifyCtx();
+    await commands[0].handler("", ctx);
 
-    const ctx = {
-      ui: { notify: () => {}, setStatus: () => {} },
-    };
-    // Should not throw despite no manager — falls back to runWorkflow
-    // (will actually try to run the script, which may error or succeed)
-    try {
-      await commands[0].handler("", ctx as never);
-    } catch {
-      // Script execution errors are expected — what matters is it didn't crash
-      // with TypeError about manager being undefined
-    }
+    // The inline fallback ran to completion and delivered the report — proving it
+    // did not crash on the missing manager and actually executed runWorkflow().
+    assert.equal(sent.length, 1, "fallback should deliver exactly one result message");
+    assert.equal(sent[0].customType, "workflow:run-inline");
+    assert.ok(sent[0].content?.includes("done"), "delivered content should include the workflow's report");
+  });
 
-    assert.ok(true, "handler ran without crashing from lack of manager");
+  it("a deleted workflow's lingering command notifies and does not run", async () => {
+    const { registerSavedWorkflow } = await load();
+    const { pi, commands, sent } = makeCommandRegistryPi();
+
+    const wf = { name: "gone", script: "export const meta = { name: 't', description: 't' };\nreturn 1;" };
+    // exists() reports the workflow has been deleted from storage.
+    registerSavedWorkflow(pi, "/cwd", wf, undefined, () => false);
+
+    const { ctx, notified } = makeNotifyCtx();
+    await commands[0].handler("", ctx);
+
+    assert.equal(sent.length, 0, "a deleted workflow should not run or deliver a result");
+    assert.equal(notified.length, 1, "the user should be told the command is stale");
+    assert.match(notified[0].message, /deleted/i);
   });
 });

@@ -24,7 +24,7 @@ import {
 import { listAvailableModelSpecs } from "./agent.js";
 import {
   buildDefaultTierConfig,
-  ensureModelTierConfig,
+  loadModelTierConfig,
   saveModelTierConfig,
   sortedTierNames,
 } from "./model-tier-config.js";
@@ -38,10 +38,11 @@ export function registerWorkflowModelsCommand(pi: ExtensionAPI): void {
     handler: async (_args, ctx) => {
       await ctx.waitForIdle();
 
-      // ensureModelTierConfig handles "fresh install" — creates default config if none exists
-      // On fresh install, all tiers default to the user's currently active Pi model.
+      // Load the saved config, or build an in-memory default (all tiers = the
+      // user's current Pi model). Nothing is written to disk until the user
+      // explicitly chooses "Save and exit".
       const currentModel = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined;
-      let config = ensureModelTierConfig(undefined, currentModel);
+      let config = loadModelTierConfig() ?? buildDefaultTierConfig(currentModel);
       let dirty = false;
 
       const ensureFresh = (cfg: typeof config) => {
@@ -82,7 +83,7 @@ export function registerWorkflowModelsCommand(pi: ExtensionAPI): void {
         if (choice === "Reset to defaults") {
           const confirmed = await ctx.ui.confirm(
             "Reset model tiers",
-            "This will replace current configuration with auto-classified defaults. Continue?",
+            "This will reset every tier to your current Pi model. Continue?",
           );
           if (confirmed) {
             ensureFresh(buildDefaultTierConfig(currentModel));

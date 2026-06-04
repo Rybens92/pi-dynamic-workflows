@@ -49,7 +49,6 @@ export interface WorkflowDisplayOptions {
   key?: string;
   placement?: "aboveEditor" | "belowEditor";
   maxAgents?: number;
-  maxLogs?: number;
   showStatus?: boolean;
   showResultPreviews?: boolean;
 }

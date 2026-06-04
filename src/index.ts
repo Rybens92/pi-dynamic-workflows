@@ -39,8 +39,6 @@ export { buildModelRoutingInstructions, parseModelRoutingFromMeta, resolveModelF
 export type { ModelTierConfig } from "./model-tier-config.js";
 export {
   buildDefaultTierConfig,
-  ensureModelTierConfig,
-  formatTierConfig,
   getModelTierConfigPath,
   loadModelTierConfig,
   resolveTierModel,

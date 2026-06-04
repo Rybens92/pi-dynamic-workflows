@@ -261,8 +261,9 @@ export function installWorkflowEditor(pi: ExtensionAPI, ui: ExtensionUIContext):
   // ensure the `workflow` tool is in the active tool set, so the model can call it.
   // We keep all existing tools (bash, read, edit, write, web_search, etc.) because
   // the model often needs them BEFORE writing the workflow script (e.g. exploring
-  // the codebase, reading files, searching for context). Only the subagent-like
-  // tools that would let the model bypass the workflow are restricted.
+  // the codebase, reading files, searching for context). This only ADDS the
+  // workflow tool to the active set; no tools are removed (the original set is
+  // saved in `savedTools` and restored elsewhere).
   //
   // NOTE: we check event.text directly (hasTrigger) rather than state.active from
   // the editor, because the editor's state is reset synchronously by submitValue()

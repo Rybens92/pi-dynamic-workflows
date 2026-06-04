@@ -57,7 +57,7 @@ function makeTheme(): import("@earendil-works/pi-tui").EditorTheme {
 
 // Pure-function tests — import from source (tsx compiles on the fly)
 async function load() {
-  return import("../dist/workflow-editor.js");
+  return import("../src/workflow-editor.js");
 }
 
 describe("hasTrigger", () => {
