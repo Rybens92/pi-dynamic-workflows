@@ -80,7 +80,11 @@ test("WorkflowAgent constructor handles all options including mainModel", () => 
 
 test("buildPrompt includes base instructions, task label, and user prompt", () => {
   const agent = new WorkflowAgent({ cwd: "/tmp", instructions: "You are a helper." });
-  const built: string = (agent as unknown as WorkflowAgentPrivates).buildPrompt("analyze this", { label: "analyzer" }, false);
+  const built: string = (agent as unknown as WorkflowAgentPrivates).buildPrompt(
+    "analyze this",
+    { label: "analyzer" },
+    false,
+  );
   assert.ok(built.includes("You are a helper."), "should include base instructions");
   assert.ok(built.includes("Task label: analyzer"), "should include task label");
   assert.ok(built.includes("analyze this"), "should include user prompt");
@@ -88,7 +92,11 @@ test("buildPrompt includes base instructions, task label, and user prompt", () =
 
 test("buildPrompt includes per-call instructions when provided", () => {
   const agent = new WorkflowAgent({ cwd: "/tmp", instructions: "Base." });
-  const built: string = (agent as unknown as WorkflowAgentPrivates).buildPrompt("do it", { label: "x", instructions: "Extra." }, false);
+  const built: string = (agent as unknown as WorkflowAgentPrivates).buildPrompt(
+    "do it",
+    { label: "x", instructions: "Extra." },
+    false,
+  );
   assert.ok(built.includes("Base."), "base instructions");
   assert.ok(built.includes("Extra."), "per-call instructions");
   assert.ok(built.includes("do it"), "user prompt");

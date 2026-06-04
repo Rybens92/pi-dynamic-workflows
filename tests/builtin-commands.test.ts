@@ -3,10 +3,10 @@ import test from "node:test";
 import { registerBuiltinWorkflows } from "../src/builtin-commands.js";
 
 test("registerBuiltinWorkflows registers deep-research and adversarial-review commands", () => {
-  const commands: Array<{ name: string; description: string; handler: Function }> = [];
+  const commands: Array<{ name: string; description: string; handler: (...args: unknown[]) => unknown }> = [];
   const pi: any = {
     getCommands: () => commands.map((c) => ({ name: c.name })),
-    registerCommand: (name: string, spec: { description: string; handler: Function }) => {
+    registerCommand: (name: string, spec: { description: string; handler: (...args: unknown[]) => unknown }) => {
       commands.push({ name, ...spec });
     },
   };
@@ -46,10 +46,10 @@ test("registerBuiltinWorkflows registers only missing commands", () => {
 });
 
 test("registerBuiltinWorkflows deep-research handler validates empty args (returns early)", async () => {
-  const commands: Array<{ name: string; handler: Function }> = [];
+  const commands: Array<{ name: string; handler: (...args: unknown[]) => unknown }> = [];
   const pi: any = {
     getCommands: () => commands.map((c) => ({ name: c.name })),
-    registerCommand: (name: string, spec: { handler: Function }) => {
+    registerCommand: (name: string, spec: { handler: (...args: unknown[]) => unknown }) => {
       commands.push({ name, handler: spec.handler });
     },
   };
@@ -71,10 +71,10 @@ test("registerBuiltinWorkflows deep-research handler validates empty args (retur
 });
 
 test("registerBuiltinWorkflows adversarial-review handler validates empty args (returns early)", async () => {
-  const commands: Array<{ name: string; handler: Function }> = [];
+  const commands: Array<{ name: string; handler: (...args: unknown[]) => unknown }> = [];
   const pi: any = {
     getCommands: () => commands.map((c) => ({ name: c.name })),
-    registerCommand: (name: string, spec: { handler: Function }) => {
+    registerCommand: (name: string, spec: { handler: (...args: unknown[]) => unknown }) => {
       commands.push({ name, handler: spec.handler });
     },
   };
@@ -96,10 +96,10 @@ test("registerBuiltinWorkflows adversarial-review handler validates empty args (
 });
 
 test("registerBuiltinWorkflows creates handlers with expected structure", () => {
-  const commands: Array<{ name: string; description: string; handler: Function }> = [];
+  const commands: Array<{ name: string; description: string; handler: (...args: unknown[]) => unknown }> = [];
   const pi: any = {
     getCommands: () => commands.map((c) => ({ name: c.name })),
-    registerCommand: (name: string, spec: { description: string; handler: Function }) => {
+    registerCommand: (name: string, spec: { description: string; handler: (...args: unknown[]) => unknown }) => {
       commands.push({ name, ...spec });
     },
   };
@@ -113,6 +113,9 @@ test("registerBuiltinWorkflows creates handlers with expected structure", () => 
 
   const advReviewCmd = commands.find((c) => c.name === "adversarial-review");
   assert.ok(advReviewCmd, "adversarial-review should be registered");
-  assert.ok(advReviewCmd.description.includes("Investigate") || advReviewCmd.description.includes("Review"), "should contain Investigate");
+  assert.ok(
+    advReviewCmd.description.includes("Investigate") || advReviewCmd.description.includes("Review"),
+    "should contain Investigate",
+  );
   assert.equal(typeof advReviewCmd.handler, "function");
 });

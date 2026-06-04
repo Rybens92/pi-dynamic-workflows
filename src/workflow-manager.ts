@@ -302,35 +302,35 @@ export class WorkflowManager extends EventEmitter {
   private persistRun(managed: ManagedRun) {
     try {
       this.persistence.save({
-      runId: managed.runId,
-      workflowName: managed.snapshot.name,
-      // Persist the real script + journal so the run can be resumed. Runs live
-      // under .pi/workflows/runs/ — protect via directory permissions, not blanking.
-      script: managed.script,
-      args: managed.args,
-      journal: managed.journal,
-      status: managed.status,
-      phases: managed.snapshot.phases,
-      currentPhase: managed.snapshot.currentPhase,
-      agents: managed.snapshot.agents.map((a) => ({
-        ...a,
+        runId: managed.runId,
+        workflowName: managed.snapshot.name,
+        // Persist the real script + journal so the run can be resumed. Runs live
+        // under .pi/workflows/runs/ — protect via directory permissions, not blanking.
+        script: managed.script,
+        args: managed.args,
+        journal: managed.journal,
+        status: managed.status,
+        phases: managed.snapshot.phases,
+        currentPhase: managed.snapshot.currentPhase,
+        agents: managed.snapshot.agents.map((a) => ({
+          ...a,
+          startedAt: managed.startedAt.toISOString(),
+          endedAt: new Date().toISOString(),
+        })),
+        logs: managed.snapshot.logs,
+        result: managed.result?.result,
+        tokenUsage: managed.snapshot.tokenUsage
+          ? {
+              input: managed.snapshot.tokenUsage.input,
+              output: managed.snapshot.tokenUsage.output,
+              total: managed.snapshot.tokenUsage.total,
+            }
+          : undefined,
         startedAt: managed.startedAt.toISOString(),
-        endedAt: new Date().toISOString(),
-      })),
-      logs: managed.snapshot.logs,
-      result: managed.result?.result,
-      tokenUsage: managed.snapshot.tokenUsage
-        ? {
-            input: managed.snapshot.tokenUsage.input,
-            output: managed.snapshot.tokenUsage.output,
-            total: managed.snapshot.tokenUsage.total,
-          }
-        : undefined,
-      startedAt: managed.startedAt.toISOString(),
-      updatedAt: new Date().toISOString(),
-      completedAt: managed.status === "completed" ? new Date().toISOString() : undefined,
-      durationMs: managed.result?.durationMs,
-    });
+        updatedAt: new Date().toISOString(),
+        completedAt: managed.status === "completed" ? new Date().toISOString() : undefined,
+        durationMs: managed.result?.durationMs,
+      });
     } catch (err) {
       // Persistence is best-effort: the run is still healthy in memory.
       // Log so an operator debugging state-loss has a lead, but never crash
@@ -358,8 +358,8 @@ export class WorkflowManager extends EventEmitter {
    * and run the rest live. Returns false if there is nothing resumable.
    */
   async resume(runId: string): Promise<boolean> {
-    // Guard: a ManagedRun already exists for this ID and is still running.
-    // Allow resume when status is paused, failed, or aborted (those can restart).
+    // Guard: refuse to resume a run that is already running, or one that was
+    // intentionally aborted (pause/stop/Esc). Paused and failed runs can restart.
     const active = this.runs.get(runId);
     if (active?.status === "running") return false;
     if (active?.status === "aborted") return false;

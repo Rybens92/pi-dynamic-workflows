@@ -337,7 +337,7 @@ describe("installWorkflowEditor - tool availability", () => {
   });
 
   it("should set editor component", async () => {
-    const { installWorkflowEditor, WorkflowEditor } = await import("../src/workflow-editor.js");
+    const { installWorkflowEditor } = await import("../src/workflow-editor.js");
 
     const mockPi = createMockPi();
     const setEditorComponent = mock.fn();
@@ -356,7 +356,10 @@ describe("installWorkflowEditor - tool availability", () => {
     const mockPi = createMockPi();
     const ui = { setEditorComponent: mock.fn() };
 
-    const state: WorkflowModeState = installWorkflowEditor(mockPi as unknown as ExtensionAPI, ui as unknown as ExtensionUIContext);
+    const state: WorkflowModeState = installWorkflowEditor(
+      mockPi as unknown as ExtensionAPI,
+      ui as unknown as ExtensionUIContext,
+    );
 
     assert.equal(typeof state.active, "boolean");
     assert.equal(state.active, false);

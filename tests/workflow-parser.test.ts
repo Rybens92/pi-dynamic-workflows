@@ -128,24 +128,15 @@ test("parseWorkflowScript rejects multiple declarations", () => {
 });
 
 test("parseWorkflowScript rejects meta without init value", () => {
-  assert.throws(
-    () => parseWorkflowScript("export const meta"),
-    /SyntaxError|must have a literal value/,
-  );
+  assert.throws(() => parseWorkflowScript("export const meta"), /SyntaxError|must have a literal value/);
 });
 
 test("parseWorkflowScript rejects empty name string", () => {
-  assert.throws(
-    () => parseWorkflowScript("export const meta = { name: '', description: 'desc' }"),
-    /non-empty string/,
-  );
+  assert.throws(() => parseWorkflowScript("export const meta = { name: '', description: 'desc' }"), /non-empty string/);
 });
 
 test("parseWorkflowScript rejects empty description string", () => {
-  assert.throws(
-    () => parseWorkflowScript("export const meta = { name: 'demo', description: '' }"),
-    /non-empty string/,
-  );
+  assert.throws(() => parseWorkflowScript("export const meta = { name: 'demo', description: '' }"), /non-empty string/);
 });
 
 test("parseWorkflowScript rejects phases that is not an array", () => {

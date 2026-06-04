@@ -119,7 +119,8 @@ export function registerWorkflowCommands(
   }
 
   pi.registerCommand("workflows", {
-    description: "Manage workflow runs — no args (opens navigator) | status/stop/pause/resume <id> | rm <id> | save <name> [runId]",
+    description:
+      "Manage workflow runs — no args (opens navigator) | status/stop/pause/resume <id> | rm <id> | save <name> [runId]",
     async handler(args: string, ctx: ExtensionCommandContext) {
       const parts = args.trim().split(/\s+/).filter(Boolean);
       const sub = (parts[0] ?? "list").toLowerCase();

@@ -70,10 +70,10 @@ describe("parseCommandArgs", () => {
 describe("registerSavedWorkflow", () => {
   it("registers a command with the workflow name", async () => {
     const { registerSavedWorkflow } = await load();
-    const commands: Array<{ name: string; description: string; handler: Function }> = [];
+    const commands: Array<{ name: string; description: string; handler: (...args: unknown[]) => unknown }> = [];
     const pi = {
       getCommands: () => commands.map((c) => ({ name: c.name })),
-      registerCommand: (name: string, spec: { description: string; handler: Function }) => {
+      registerCommand: (name: string, spec: { description: string; handler: (...args: unknown[]) => unknown }) => {
         commands.push({ name, ...spec });
       },
     };
@@ -133,10 +133,10 @@ describe("registerSavedWorkflow", () => {
       },
     };
 
-    const commands: Array<{ name: string; handler: Function }> = [];
+    const commands: Array<{ name: string; handler: (...args: unknown[]) => unknown }> = [];
     const pi = {
       getCommands: () => commands.map((c) => ({ name: c.name })),
-      registerCommand: (name: string, spec: { handler: Function }) => {
+      registerCommand: (name: string, spec: { handler: (...args: unknown[]) => unknown }) => {
         commands.push({ name, handler: spec.handler });
       },
     };
@@ -156,10 +156,10 @@ describe("registerSavedWorkflow", () => {
   it("falls back to runWorkflow when no manager", async () => {
     const { registerSavedWorkflow } = await load();
 
-    const commands: Array<{ name: string; handler: Function }> = [];
+    const commands: Array<{ name: string; handler: (...args: unknown[]) => unknown }> = [];
     const pi = {
       getCommands: () => commands.map((c) => ({ name: c.name })),
-      registerCommand: (name: string, spec: { handler: Function }) => {
+      registerCommand: (name: string, spec: { handler: (...args: unknown[]) => unknown }) => {
         commands.push({ name, handler: spec.handler });
       },
     };

@@ -89,8 +89,8 @@ describe("installResultDelivery", () => {
     assert.ok(calls[0].content.includes("All tests passed"), "should contain All tests passed");
     assert.ok(calls[0].content.includes("test-workflow"), "should contain test-workflow");
     assert.ok(calls[0].content.includes("3 agents"), "should contain 3 agents");
-    // locale may format as 50,000 / 50.000 / 50 000
-    assert.ok(/50\s*000/.test(calls[0].content), "should contain 50000 tokens formatted");
+    // locale may format the group separator as ',' / '.' / ' ' / none
+    assert.ok(/50[\s,.]?000/.test(calls[0].content), "should contain 50000 tokens formatted");
     assert.ok(calls[0].content.includes("1.5s"), "should contain 1.5s");
   });
 
@@ -190,7 +190,7 @@ describe("installResultDelivery", () => {
     mod.installResultDelivery(pi as unknown as ExtensionAPI, manager);
     // Should not throw — stale ctx is silently swallowed
     manager.emit("complete", { runId: "test-run-1" });
-    assert.ok(true, "should not throw");  // reached without crash
+    assert.ok(true, "should not throw"); // reached without crash
   });
 
   // ── Only background runs are delivered ──

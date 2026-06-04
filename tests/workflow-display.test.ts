@@ -17,7 +17,11 @@ import type { WorkflowMeta } from "../src/workflow.js";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function fakeMeta(name = "test-wf", desc = "test description", phases: string[] = ["Research", "Build", "Verify"]): WorkflowMeta {
+function fakeMeta(
+  name = "test-wf",
+  desc = "test description",
+  phases: string[] = ["Research", "Build", "Verify"],
+): WorkflowMeta {
   return { name, description: desc, phases: phases.map((t) => ({ title: t })) };
 }
 
@@ -421,11 +425,6 @@ describe("display pure helpers", () => {
     const result = preview(arr, 50);
     assert.ok(result.length > 0, "result should not be empty");
     assert.ok(result.includes("1"), "should contain 1");
-  });
-
-  it("statusIcon returns correct icons per status", async () => {
-    const { renderWorkflowLines } = await loadDisplay();
-    // tested indirectly through renderWorkflowLines
   });
 
   it("statusLine shows completed state", async () => {

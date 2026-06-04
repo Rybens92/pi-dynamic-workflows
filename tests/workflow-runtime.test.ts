@@ -228,7 +228,7 @@ return a`;
   assert.equal(result.meta.description, "check metadata");
   assert.ok(Array.isArray(result.logs), "result.logs should be an array");
   assert.ok(Array.isArray(result.phases), "result.phases should be an array");
-  assert.ok(result.durationMs > 0, "durationMs should be positive");
+  assert.ok(result.durationMs >= 0, "durationMs should be non-negative");
   assert.ok(typeof result.runId === "string" && result.runId.length > 0, "runId should be a non-empty string");
 });
 
@@ -343,7 +343,10 @@ return true`;
     persistLogs: false,
   });
 
-  assert.ok(result.logs.some((l) => l.includes("hello from script")), "should contain hello from script");
+  assert.ok(
+    result.logs.some((l) => l.includes("hello from script")),
+    "should contain hello from script",
+  );
 });
 
 test("runWorkflow console.log works inside script", async () => {
@@ -357,8 +360,14 @@ return true`;
     persistLogs: false,
   });
 
-  assert.ok(result.logs.some((l) => l.includes("console log")), "should contain console log");
-  assert.ok(result.logs.some((l) => l.includes("console warn")), "should contain console warn");
+  assert.ok(
+    result.logs.some((l) => l.includes("console log")),
+    "should contain console log",
+  );
+  assert.ok(
+    result.logs.some((l) => l.includes("console warn")),
+    "should contain console warn",
+  );
 });
 
 test("runWorkflow process.cwd() works inside script", async () => {

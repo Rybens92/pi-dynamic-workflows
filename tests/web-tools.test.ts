@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createWebFetchTool, createWebSearchTool, createWebTools, htmlToText, parseBingResults } from "../src/web-tools.js";
+import {
+  createWebFetchTool,
+  createWebSearchTool,
+  createWebTools,
+  htmlToText,
+  parseBingResults,
+} from "../src/web-tools.js";
 
 // ─── createWebSearchTool ─────────────────────────────────────────────────────
 

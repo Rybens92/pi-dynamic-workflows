@@ -85,7 +85,10 @@ test("suggestWorkflowScript returns a valid parseable script", () => {
   const script = suggestWorkflowScript("analyze all source files");
   assert.ok(script.startsWith("export const meta = {"), "should start with export const meta = {");
   assert.ok(script.includes("name: 'auto_generated'"), "should contain name: 'auto_generated");
-  assert.ok(script.includes("description: 'analyze all source files'"), "should contain description: 'analyze all source files");
+  assert.ok(
+    script.includes("description: 'analyze all source files'"),
+    "should contain description: 'analyze all source files",
+  );
   assert.ok(script.includes("agent("), "should contain agent(");
   assert.ok(script.includes("phase("), "should contain phase(");
   assert.ok(script.includes("parallel("), "should contain parallel(");
@@ -101,8 +104,8 @@ test("suggestWorkflowScript includes phases: Analyze, Execute, Verify", () => {
 
 test("suggestWorkflowScript escapes single quotes in description", () => {
   const script = suggestWorkflowScript("it's a test");
-  assert.ok(!script.includes("it's"), "should not contain it's");  // should be escaped
-  assert.ok(script.includes("it\\'s"), "should contain it\\'s");  // escaped version
+  assert.ok(!script.includes("it's"), "should not contain it's"); // should be escaped
+  assert.ok(script.includes("it\\'s"), "should contain it\\'s"); // escaped version
 });
 
 test("suggestWorkflowScript truncates long descriptions", () => {

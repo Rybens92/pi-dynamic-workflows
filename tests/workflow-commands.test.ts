@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import test from "node:test";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import type { WorkflowManager } from "../src/workflow-manager.js";
 import { registerWorkflowCommands } from "../src/workflow-commands.js";
+import type { WorkflowManager } from "../src/workflow-manager.js";
 
 type Handler = (args: string, ctx: any) => Promise<void>;
 
@@ -183,7 +183,10 @@ test("/workflows pause without id warns usage", async () => {
 test("/workflows pause <id> warns when manager.pause returns false", async () => {
   const h = harness({ pause: () => false });
   await h.run("pause run-nonexistent");
-  assert.ok(h.notified.some((n) => n.message.includes("Cannot pause")), "should show cannot pause");
+  assert.ok(
+    h.notified.some((n) => n.message.includes("Cannot pause")),
+    "should show cannot pause",
+  );
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -192,11 +195,20 @@ test("/workflows pause <id> warns when manager.pause returns false", async () =>
 
 test("/workflows resume <id> calls manager.resume and notifies Resumed", async () => {
   const h = harness({
-    resume: async (id: string) => { h.calls.push(`resume:${id}`); return true; },
+    resume: async (id: string) => {
+      h.calls.push(`resume:${id}`);
+      return true;
+    },
   });
   await h.run("resume run-r1");
-  assert.ok(h.calls.some((c) => c.startsWith("resume:run-r1")), "should call manager.resume");
-  assert.ok(h.notified.some((n) => n.message.includes("Resumed")), "should notify Resumed");
+  assert.ok(
+    h.calls.some((c) => c.startsWith("resume:run-r1")),
+    "should call manager.resume",
+  );
+  assert.ok(
+    h.notified.some((n) => n.message.includes("Resumed")),
+    "should notify Resumed",
+  );
 });
 
 test("/workflows resume without id warns usage", async () => {
@@ -210,7 +222,10 @@ test("/workflows resume without id warns usage", async () => {
 test("/workflows resume <id> warns when resume returns false", async () => {
   const h = harness({ resume: async () => false });
   await h.run("resume run-fail");
-  assert.ok(h.notified.some((n) => n.message.includes("Resume not available")), "should show not available");
+  assert.ok(
+    h.notified.some((n) => n.message.includes("Resume not available")),
+    "should show not available",
+  );
   assert.equal(h.notified.find((n) => n.message.includes("Resume not available"))?.type, "warning");
 });
 
@@ -222,7 +237,10 @@ test("/workflows rm <id> calls manager.deleteRun and notifies Removed", async ()
   const h = harness();
   await h.run("rm run-del1");
   assert.deepEqual(h.calls, ["rm:run-del1"], "should call manager.deleteRun");
-  assert.ok(h.notified.some((n) => n.message.includes("Removed")), "should notify Removed");
+  assert.ok(
+    h.notified.some((n) => n.message.includes("Removed")),
+    "should notify Removed",
+  );
 });
 
 test("/workflows rm without id warns usage", async () => {
@@ -236,7 +254,10 @@ test("/workflows rm without id warns usage", async () => {
 test("/workflows rm <id> warns when deleteRun returns false", async () => {
   const h = harness({ deleteRun: () => false });
   await h.run("rm run-missing");
-  assert.ok(h.notified.some((n) => n.message.includes("No run")), "should show No run");
+  assert.ok(
+    h.notified.some((n) => n.message.includes("No run")),
+    "should show No run",
+  );
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -254,7 +275,10 @@ test("/workflows stop without id warns usage", async () => {
 test("/workflows stop <id> shows Cannot stop when manager returns false", async () => {
   const h = harness({ stop: () => false, getRun: () => undefined });
   await h.run("stop run-nonexistent");
-  assert.ok(h.notified.some((n) => n.message.includes("Cannot stop")), "should show cannot stop");
+  assert.ok(
+    h.notified.some((n) => n.message.includes("Cannot stop")),
+    "should show cannot stop",
+  );
   assert.equal(h.notified.find((n) => n.message.includes("Cannot stop"))?.type, "warning");
 });
 
@@ -288,21 +312,50 @@ test("/workflows save <name> warns when no storage configured", async () => {
 
 test("/workflows save <name> saves the most recent run with a script", async () => {
   const saved: Array<{ name: string; description: string; script: string }> = [];
-  const h = harness({
+  const _h = harness({
     listRuns: () => [
       { runId: "old", workflowName: "old", status: "completed", script: null, agents: [], logs: [] },
-      { runId: "recent", workflowName: "scan", status: "completed", script: "export const meta = { name: 'scan', description: 'scan' }", agents: [], logs: [] },
+      {
+        runId: "recent",
+        workflowName: "scan",
+        status: "completed",
+        script: "export const meta = { name: 'scan', description: 'scan' }",
+        agents: [],
+        logs: [],
+      },
     ],
   });
   // Register with storage mock
   const storage: any = {
-    save: (w: any) => { saved.push(w); return { ...w, id: "saved-1" }; },
+    save: (w: any) => {
+      saved.push(w);
+      return { ...w, id: "saved-1" };
+    },
   };
   registerWorkflowCommands(
-    { getCommands: () => [], registerCommand: (_n: string, o: any) => {}, sendMessage: async () => {} } as unknown as ExtensionAPI,
-    { listRuns: () => [
-      { runId: "recent", workflowName: "scan", status: "completed", script: "export const meta = { name: 'scan', description: 'scan' }", agents: [], logs: [] },
-    ], getSnapshot: () => null, getRun: () => undefined, pause: () => false, resume: async () => false, stop: () => false, deleteRun: () => false } as unknown as WorkflowManager,
+    {
+      getCommands: () => [],
+      registerCommand: (_n: string, _o: any) => {},
+      sendMessage: async () => {},
+    } as unknown as ExtensionAPI,
+    {
+      listRuns: () => [
+        {
+          runId: "recent",
+          workflowName: "scan",
+          status: "completed",
+          script: "export const meta = { name: 'scan', description: 'scan' }",
+          agents: [],
+          logs: [],
+        },
+      ],
+      getSnapshot: () => null,
+      getRun: () => undefined,
+      pause: () => false,
+      resume: async () => false,
+      stop: () => false,
+      deleteRun: () => false,
+    } as unknown as WorkflowManager,
     { storage },
   );
 
@@ -312,11 +365,21 @@ test("/workflows save <name> saves the most recent run with a script", async () 
 test("/workflows save <name> <runId> saves the specified run", async () => {
   const saved: Array<{ name: string; description: string; script: string }> = [];
   const storage: any = {
-    save: (w: any) => { saved.push(w); return { ...w, id: "saved-2" }; },
+    save: (w: any) => {
+      saved.push(w);
+      return { ...w, id: "saved-2" };
+    },
   };
 
   const runs = [
-    { runId: "run-target", workflowName: "audit", status: "completed", script: "export const meta = { name: 'audit', description: 'audit' }", agents: [], logs: [] },
+    {
+      runId: "run-target",
+      workflowName: "audit",
+      status: "completed",
+      script: "export const meta = { name: 'audit', description: 'audit' }",
+      agents: [],
+      logs: [],
+    },
   ];
 
   // Override the handler for one invocation
@@ -324,18 +387,37 @@ test("/workflows save <name> <runId> saves the specified run", async () => {
   const notified: Array<{ message: string; type?: string }> = [];
   let handler: any;
   reg2(
-    { getCommands: () => [{ name: "xxx" }], registerCommand: (_n: string, o: any) => { handler = o.handler; }, sendMessage: async () => {} } as unknown as ExtensionAPI,
-    { listRuns: () => runs, getSnapshot: () => null, getRun: () => undefined, pause: () => false, resume: async () => false, stop: () => false, deleteRun: () => false } as unknown as WorkflowManager,
+    {
+      getCommands: () => [{ name: "xxx" }],
+      registerCommand: (_n: string, o: any) => {
+        handler = o.handler;
+      },
+      sendMessage: async () => {},
+    } as unknown as ExtensionAPI,
+    {
+      listRuns: () => runs,
+      getSnapshot: () => null,
+      getRun: () => undefined,
+      pause: () => false,
+      resume: async () => false,
+      stop: () => false,
+      deleteRun: () => false,
+    } as unknown as WorkflowManager,
     { storage },
   );
 
   if (handler) {
-    await handler("save target-name run-target", { ui: { notify: (m: string, t?: string) => notified.push({ message: m, type: t }) } });
+    await handler("save target-name run-target", {
+      ui: { notify: (m: string, t?: string) => notified.push({ message: m, type: t }) },
+    });
   }
   assert.equal(saved.length, 1, "should save one workflow");
   assert.equal(saved[0].name, "target-name");
   assert.equal(saved[0].script, runs[0].script);
-  assert.ok(notified.some((n) => n.message.includes("Saved")), "should notify Saved");
+  assert.ok(
+    notified.some((n) => n.message.includes("Saved")),
+    "should notify Saved",
+  );
 });
 
 test("/workflows save <name> <runId> warns when run has no script", async () => {
@@ -344,13 +426,29 @@ test("/workflows save <name> <runId> warns when run has no script", async () => 
   const { registerWorkflowCommands: reg3 } = await import("../src/workflow-commands.js");
   const notified: Array<{ message: string; type?: string }> = [];
   reg3(
-    { getCommands: () => [{ name: "xxx" }], registerCommand: (_n: string, o: any) => { handler = o.handler; }, sendMessage: async () => {} } as unknown as ExtensionAPI,
-    { listRuns: () => [{ runId: "no-script", workflowName: "empty", status: "completed", agents: [], logs: [] }], getSnapshot: () => null, getRun: () => undefined, pause: () => false, resume: async () => false, stop: () => false, deleteRun: () => false } as unknown as WorkflowManager,
+    {
+      getCommands: () => [{ name: "xxx" }],
+      registerCommand: (_n: string, o: any) => {
+        handler = o.handler;
+      },
+      sendMessage: async () => {},
+    } as unknown as ExtensionAPI,
+    {
+      listRuns: () => [{ runId: "no-script", workflowName: "empty", status: "completed", agents: [], logs: [] }],
+      getSnapshot: () => null,
+      getRun: () => undefined,
+      pause: () => false,
+      resume: async () => false,
+      stop: () => false,
+      deleteRun: () => false,
+    } as unknown as WorkflowManager,
     { storage },
   );
 
   if (handler) {
-    await handler("save empty no-script", { ui: { notify: (m: string, t?: string) => notified.push({ message: m, type: t }) } });
+    await handler("save empty no-script", {
+      ui: { notify: (m: string, t?: string) => notified.push({ message: m, type: t }) },
+    });
   }
   assert.equal(notified.length, 1);
   assert.match(notified[0].message, /No run/, "should warn no script");

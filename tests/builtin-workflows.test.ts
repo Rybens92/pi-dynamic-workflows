@@ -46,7 +46,7 @@ test("generateAdversarialReviewWorkflow phases are Investigate, Refute, Consensu
 // ─── Codebase Audit ─────────────────────────────────────────────────────────────
 
 test("generateCodebaseAuditWorkflow produces a valid, parseable script", () => {
-  const { meta, body } = parseWorkflowScript(
+  const { meta } = parseWorkflowScript(
     generateCodebaseAuditWorkflow("src/", ["check types", "find bugs", "review style"]),
   );
   assert.equal(meta.name, "codebase_audit");

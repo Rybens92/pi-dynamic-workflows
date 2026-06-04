@@ -4,7 +4,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { createWorktree as createWorktreeLive, removeWorktree, type Worktree } from "../src/worktree.js";
+import { createWorktree as createWorktreeLive, removeWorktree } from "../src/worktree.js";
 
 // ── Existing tests (unchanged) ──
 
@@ -109,10 +109,7 @@ test("createWorktree falls back when target branch already exists", async () => 
     const wt = await createWorktreeLive(repo, name);
     assert.equal(wt.isolated, false);
     assert.equal(wt.cwd, repo);
-    assert.ok(
-      /already exists/i.test(wt.reason ?? ""),
-      `Expected 'already exists' error, got: ${wt.reason}`,
-    );
+    assert.ok(/already exists/i.test(wt.reason ?? ""), `Expected 'already exists' error, got: ${wt.reason}`);
   } finally {
     rmSync(repo, { recursive: true, force: true });
   }

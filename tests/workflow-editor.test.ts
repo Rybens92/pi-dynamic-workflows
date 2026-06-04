@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { dirname, join } from "node:path";
 import { before, describe, it } from "node:test";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
-import type { ExtensionAPI, ExtensionUIContext, KeybindingsManager } from "@earendil-works/pi-coding-agent";
-import { TUI, type Terminal } from "@earendil-works/pi-tui";
+import type { ExtensionAPI, ExtensionUIContext } from "@earendil-works/pi-coding-agent";
+import { type Terminal, TUI } from "@earendil-works/pi-tui";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -227,6 +229,9 @@ describe("colorizeWorkflow", () => {
     const result = colorizeWorkflow("workflow workflow", 0, palette);
     // Per-character ANSI wrapping — each of the 16 chars (2x "workflow" = 16 chars)
     // should have ANSI color codes around them
+    // The ESC (U+001B) control char is intentional here — it matches real ANSI
+    // color codes emitted by colorizeWorkflow.
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: matching literal ANSI escape sequences
     const ansiCodes = result.match(/\x1b\[38;5;\d+m/g);
     assert.equal(ansiCodes.length, 16, "each char of both words should be colored");
   });
@@ -281,7 +286,10 @@ describe("RAINBOW", () => {
 
 describe("WorkflowEditor", () => {
   type KBManagerClass = {
-    new (userBindings?: unknown, configPath?: string): {
+    new (
+      userBindings?: unknown,
+      configPath?: string,
+    ): {
       matches(data: string, keybinding: string): boolean;
     };
   };
@@ -291,16 +299,22 @@ describe("WorkflowEditor", () => {
 
   before(async () => {
     mod = await load();
-    // Dynamic import: KeybindingsManager is not on the main exports path.
-    const core = await import(
-      "/home/rybens/Projects/pi-dynamic-workflows/node_modules/@earendil-works/pi-coding-agent/dist/core/keybindings.js"
-    );
+    // KeybindingsManager is not on the package's main exports path, so resolve
+    // the package entry portably (no hardcoded absolute path) and derive the
+    // internal module location relative to it. import.meta.resolve honours the
+    // package's "import" export condition (require.resolve would fail — the
+    // package defines no "require" condition).
+    const pkgEntryUrl = import.meta.resolve("@earendil-works/pi-coding-agent");
+    const distDir = dirname(fileURLToPath(pkgEntryUrl));
+    const keybindingsPath = join(distDir, "core", "keybindings.js");
+    const core = await import(pathToFileURL(keybindingsPath).href);
     KB = core.KeybindingsManager as unknown as KBManagerClass;
   });
 
-  function createEditor(
-    stateOverrides?: Partial<{ active: boolean }>,
-  ): { editor: InstanceType<Awaited<ReturnType<typeof load>>["WorkflowEditor"]>; state: { active: boolean } } {
+  function createEditor(stateOverrides?: Partial<{ active: boolean }>): {
+    editor: InstanceType<Awaited<ReturnType<typeof load>>["WorkflowEditor"]>;
+    state: { active: boolean };
+  } {
     const tui = createMockTui();
     const theme = makeTheme();
     const kb = new KB();
@@ -396,7 +410,7 @@ describe("installWorkflowEditor", () => {
 
   it("sets the editor component via ui.setEditorComponent", async () => {
     const mod = await load();
-    let setFactory: unknown = undefined;
+    let setFactory: unknown;
     const pi = {
       on: () => {},
       getActiveTools: () => [],
@@ -460,23 +474,20 @@ describe("installWorkflowEditor", () => {
     assert.notEqual(inputHandler, undefined, "input handler should be registered");
 
     // Invoke with non-trigger text — should NOT save tools
-    const resultNonTrigger = inputHandler!({ source: "interactive", text: "hello world" });
+    const resultNonTrigger = inputHandler?.({ source: "interactive", text: "hello world" });
     assert.deepEqual(resultNonTrigger, { action: "continue" }, "non-trigger input should return continue");
     assert.deepEqual(savedTools, [], "tools should not change for non-trigger input");
 
     // Invoke with trigger text — should save and add WORKFLOW_TOOL_NAME
-    const resultTrigger = inputHandler!({ source: "interactive", text: "run a workflow test" });
+    const resultTrigger = inputHandler?.({ source: "interactive", text: "run a workflow test" });
     assert.ok(typeof resultTrigger === "object" && resultTrigger !== null, "should return a result object");
     assert.equal(resultTrigger.action, "transform", "should return transform action");
     assert.ok(
       typeof resultTrigger.text === "string" && resultTrigger.text.length > 0,
       "should return transformed text",
     );
-    assert.ok(resultTrigger.text!.includes("run a workflow test"), "transformed text should include original prompt");
-    assert.ok(
-      savedTools.includes("workflow"),
-      `saved tools (${savedTools.join(", ")}) should include "workflow"`,
-    );
+    assert.ok(resultTrigger.text?.includes("run a workflow test"), "transformed text should include original prompt");
+    assert.ok(savedTools.includes("workflow"), `saved tools (${savedTools.join(", ")}) should include "workflow"`);
   });
 
   it("restores original tools on turn_end after a triggered turn", async () => {
@@ -508,12 +519,12 @@ describe("installWorkflowEditor", () => {
     const initialTools = ["bash", "read", "edit", "write"];
 
     // First trigger: save tools and add "workflow"
-    inputHandler!({ source: "interactive", text: "trigger workflow test" });
+    inputHandler?.({ source: "interactive", text: "trigger workflow test" });
     assert.ok(currentTools.includes("workflow"), "workflow tool should be added");
     assert.ok(currentTools.length > initialTools.length, "tool set should be expanded");
 
     // turn_end: restore to saved tools
-    turnEndHandler!();
+    turnEndHandler?.();
     assert.deepEqual(currentTools, initialTools, "tools should be restored after turn_end");
   });
 
@@ -529,7 +540,7 @@ describe("installWorkflowEditor", () => {
       getActiveTools: () => [...currentTools],
       setActiveTools: (tools: string[]) => {
         currentTools = [...tools];
-    },
+      },
     } as unknown as ExtensionAPI;
 
     const ui = {
@@ -541,13 +552,9 @@ describe("installWorkflowEditor", () => {
     const inputHandler = captured.find((c) => c.event === "input")?.handler;
     assert.notEqual(inputHandler, undefined);
 
-    inputHandler!({ source: "interactive", text: "run workflow" });
+    inputHandler?.({ source: "interactive", text: "run workflow" });
     // "workflow" was already present, so tool count should not increase beyond duplicates
-    assert.equal(
-      currentTools.filter((t) => t === "workflow").length,
-      1,
-      "workflow should appear exactly once",
-    );
+    assert.equal(currentTools.filter((t) => t === "workflow").length, 1, "workflow should appear exactly once");
   });
 
   it("input handler ignores non-interactive sources", async () => {
@@ -573,7 +580,7 @@ describe("installWorkflowEditor", () => {
     assert.notEqual(inputHandler, undefined);
 
     // Non-interactive source with trigger text should still transform
-    const result = inputHandler!({ source: "paste", text: "run a workflow scenario" });
+    const result = inputHandler?.({ source: "paste", text: "run a workflow scenario" });
     assert.deepEqual(result, { action: "continue" }, "non-interactive source should return continue");
   });
 });

@@ -87,7 +87,10 @@ test("createStructuredOutputTool has promptSnippet and promptGuidelines", () => 
   assert.ok(Array.isArray(tool.promptGuidelines), "tool.promptGuidelines should be an array");
   assert.ok(tool.promptGuidelines.length > 0, "tool.promptGuidelines should not be empty");
   // Should mention the tool name in guidelines
-  assert.ok(tool.promptGuidelines.some((g: string) => g.includes("structured_output")), "should contain structured_output");
+  assert.ok(
+    tool.promptGuidelines.some((g: string) => g.includes("structured_output")),
+    "should contain structured_output",
+  );
 });
 
 test("createStructuredOutputTool uses parameters from schema", () => {

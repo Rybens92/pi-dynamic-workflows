@@ -1248,8 +1248,8 @@ test(
     await new Promise((r) => setTimeout(r, 20));
 
     // Call pause and stop without awaiting — synchronous in the event loop
-    const pauseResult = manager.pause(runId);
-    const stopResult = manager.stop(runId);
+    const _pauseResult = manager.pause(runId);
+    const _stopResult = manager.stop(runId);
 
     // Final state must always be "aborted" because:
     //   pause transitions "running" → "paused"
@@ -1283,11 +1283,7 @@ test(
     // null, workflow continues). A non-recoverable WorkflowError propagates up
     // to executeRun's catch block and sets status to "failed".
     test.mock.method(da.runner, "run", async (_prompt: string) => {
-      throw new WorkflowError(
-        "fatal agent error",
-        WorkflowErrorCode.AGENT_EXECUTION_ERROR,
-        { recoverable: false },
-      );
+      throw new WorkflowError("fatal agent error", WorkflowErrorCode.AGENT_EXECUTION_ERROR, { recoverable: false });
     });
 
     try {
@@ -1359,11 +1355,7 @@ test(
 
     // Mock agent to throw a non-recoverable WorkflowError, making the run fail
     test.mock.method(da.runner, "run", async (_prompt: string) => {
-      throw new WorkflowError(
-        "fatal agent error",
-        WorkflowErrorCode.AGENT_EXECUTION_ERROR,
-        { recoverable: false },
-      );
+      throw new WorkflowError("fatal agent error", WorkflowErrorCode.AGENT_EXECUTION_ERROR, { recoverable: false });
     });
 
     try {
@@ -1380,11 +1372,7 @@ test(
       // pause() should return false for a failed run (requires status === "running")
       const paused = manager.pause(runId);
       assert.equal(paused, false, "pause should return false for failed run");
-      assert.equal(
-        manager.getRun(runId)?.status,
-        "failed",
-        "status should remain failed after rejected pause",
-      );
+      assert.equal(manager.getRun(runId)?.status, "failed", "status should remain failed after rejected pause");
     } finally {
       da.runner.run = async (_prompt: string) => "done";
       da.resolve("done");
@@ -1409,11 +1397,7 @@ test(
 
     // Mock agent to throw a non-recoverable WorkflowError
     test.mock.method(da.runner, "run", async (_prompt: string) => {
-      throw new WorkflowError(
-        "fatal agent error",
-        WorkflowErrorCode.AGENT_EXECUTION_ERROR,
-        { recoverable: false },
-      );
+      throw new WorkflowError("fatal agent error", WorkflowErrorCode.AGENT_EXECUTION_ERROR, { recoverable: false });
     });
 
     try {
@@ -1430,11 +1414,7 @@ test(
       // stop() should return false for a failed run (requires "running" or "paused")
       const stopped = manager.stop(runId);
       assert.equal(stopped, false, "stop should return false for failed run");
-      assert.equal(
-        manager.getRun(runId)?.status,
-        "failed",
-        "status should remain failed after rejected stop",
-      );
+      assert.equal(manager.getRun(runId)?.status, "failed", "status should remain failed after rejected stop");
     } finally {
       da.runner.run = async (_prompt: string) => "done";
       da.resolve("done");
@@ -1459,11 +1439,7 @@ test(
 
     // Mock agent to throw a non-recoverable WorkflowError
     test.mock.method(da.runner, "run", async (_prompt: string) => {
-      throw new WorkflowError(
-        "fatal agent error",
-        WorkflowErrorCode.AGENT_EXECUTION_ERROR,
-        { recoverable: false },
-      );
+      throw new WorkflowError("fatal agent error", WorkflowErrorCode.AGENT_EXECUTION_ERROR, { recoverable: false });
     });
 
     try {
@@ -1485,21 +1461,13 @@ test(
     // Resume the failed run — resume() allows failed status
     const resumed = await manager.resume(runId);
     assert.equal(resumed, true, "resume should return true for a failed run");
-    assert.equal(
-      manager.getRun(runId)?.status,
-      "running",
-      "resumed failed run should transition to running",
-    );
+    assert.equal(manager.getRun(runId)?.status, "running", "resumed failed run should transition to running");
 
     // Wait for the resumed run to complete successfully
     await new Promise((r) => setTimeout(r, 100));
 
     const finalRun = manager.getRun(runId);
-    assert.equal(
-      finalRun?.status,
-      "completed",
-      "resumed failed run should complete successfully after restore",
-    );
+    assert.equal(finalRun?.status, "completed", "resumed failed run should complete successfully after restore");
   }),
 );
 
@@ -1535,11 +1503,7 @@ const results = await parallel([1,2,3].map(n => () => agent('task ' + n)))
 return results`;
     const result = await manager.runSync(script);
     assert.equal(result.agentCount, 3, "3 agents should have run");
-    assert.deepEqual(
-      result.result,
-      ["task 1", "task 2", "task 3"],
-      "parallel should return results in input order",
-    );
+    assert.deepEqual(result.result, ["task 1", "task 2", "task 3"], "parallel should return results in input order");
   }),
 );
 

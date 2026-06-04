@@ -80,7 +80,7 @@ describe("errors", () => {
   });
 
   it("wrapError adds agent label context", async () => {
-    const { wrapError, WorkflowErrorCode } = await loadErrors();
+    const { wrapError } = await loadErrors();
     const result = wrapError(new Error("fail"), { agentLabel: "agent-x" });
     assert.equal(result.agentLabel, "agent-x");
   });
@@ -204,7 +204,7 @@ describe("display", () => {
     const { preview } = await load();
     const long = "x".repeat(200);
     const result = preview(long, 10);
-    assert.ok(result.length <= 13, "result should be at most 13");  // 10 + "…" (3 bytes)
+    assert.ok(result.length <= 13, "result should be at most 13"); // 10 + "…" (3 bytes)
   });
 
   it("preview returns full short values", async () => {
@@ -302,7 +302,9 @@ describe("display", () => {
     const { createWorkflowSnapshot, renderWorkflowLines } = await load();
     const meta: WorkflowMeta = { name: "wf", description: "d", phases: [{ title: "Research" }] };
     const snap = createWorkflowSnapshot(meta);
-    snap.agents = [{ id: 1, label: "agent-1", prompt: "x", status: "done", phase: "Research" }] as WorkflowAgentSnapshot[];
+    snap.agents = [
+      { id: 1, label: "agent-1", prompt: "x", status: "done", phase: "Research" },
+    ] as WorkflowAgentSnapshot[];
     const lines = renderWorkflowLines(snap);
     const text = lines.join("\n");
     assert.ok(text.includes("Research"), "should contain Research");
@@ -327,7 +329,9 @@ describe("display", () => {
     const { createWorkflowSnapshot, renderWorkflowLines } = await load();
     const meta: WorkflowMeta = { name: "wf", description: "d" };
     const snap = createWorkflowSnapshot(meta);
-    snap.agents = [{ id: 1, label: "a1", prompt: "x", status: "done", resultPreview: "found 3 issues" }] as WorkflowAgentSnapshot[];
+    snap.agents = [
+      { id: 1, label: "a1", prompt: "x", status: "done", resultPreview: "found 3 issues" },
+    ] as WorkflowAgentSnapshot[];
     const lines = renderWorkflowLines(snap, { showResultPreviews: true });
     const text = lines.join("\n");
     assert.ok(text.includes("found 3 issues"), "should contain found 3 issues");

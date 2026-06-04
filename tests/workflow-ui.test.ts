@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { ManagedRun, WorkflowManager } from "../src/workflow-manager.js";
-import type { PersistedRunState } from "../src/run-persistence.js";
-import type { SavedWorkflow } from "../src/workflow-saved.js";
 import type { WorkflowSnapshot } from "../src/display.js";
+import type { PersistedRunState } from "../src/run-persistence.js";
+import type { ManagedRun, WorkflowManager } from "../src/workflow-manager.js";
+import type { SavedWorkflow } from "../src/workflow-saved.js";
 import { keyToAction, NavigatorModel, NavigatorState, renderNavigator } from "../src/workflow-ui.js";
 
 /** Fake manager exposing one running run with two phases. */
@@ -62,8 +62,22 @@ function fakeManager(): Pick<WorkflowManager, "listRuns" | "getRun"> {
 function multiRunManager(): Pick<WorkflowManager, "listRuns" | "getRun"> {
   return {
     listRuns: () => [
-      { runId: "r1", workflowName: "a-workflow", status: "running", phases: [], agents: [], logs: [] } as unknown as PersistedRunState,
-      { runId: "r2", workflowName: "b-workflow", status: "completed", phases: [], agents: [], logs: [] } as unknown as PersistedRunState,
+      {
+        runId: "r1",
+        workflowName: "a-workflow",
+        status: "running",
+        phases: [],
+        agents: [],
+        logs: [],
+      } as unknown as PersistedRunState,
+      {
+        runId: "r2",
+        workflowName: "b-workflow",
+        status: "completed",
+        phases: [],
+        agents: [],
+        logs: [],
+      } as unknown as PersistedRunState,
     ],
     getRun: () => undefined,
   };
